@@ -1,0 +1,31 @@
+# Dependencies
+/vendor/
+composer.lock
+
+# IDE
+/.idea/
+/.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Testing
+/coverage/
+.phpunit.result.cache
+.phpunit.cache/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build
+/build/
+/dist/
+
+# Logs
+*.log
+npm-debug.log*
+
+# PHPStan
+phpstan.neon.local
