@@ -1,10 +1,11 @@
 {
   "_metadata": {
-    "version": "1.0",
+    "version": "1.1",
     "last_updated": "2026-02-02",
     "description": "Crisis detection keywords for Sisly safety layer",
     "languages": ["en", "ar"],
-    "notes": "Keywords must be matched case-insensitively. Patterns support 'exact' and 'regex' types."
+    "dialects": ["msa", "gulf"],
+    "notes": "Keywords must be matched case-insensitively. Patterns support 'exact' and 'regex' types. Arabic includes both MSA and Gulf dialect variations."
   },
   "categories": {
     "suicide": {
@@ -45,7 +46,14 @@
           {"text": "افضل لو كنت ميت", "type": "exact"},
           {"text": "الموت أفضل", "type": "exact"},
           {"text": "الموت افضل", "type": "exact"},
-          {"text": "تعبت من الحياة", "type": "exact"}
+          {"text": "تعبت من الحياة", "type": "exact"},
+          {"text": "بنتحر", "type": "exact"},
+          {"text": "ودي اموت", "type": "exact"},
+          {"text": "ابي اموت", "type": "exact"},
+          {"text": "ماني قادر اكمل", "type": "exact"},
+          {"text": "مابي اعيش", "type": "exact"},
+          {"text": "خلاص تعبت", "type": "exact"},
+          {"text": "ماله داعي اعيش", "type": "exact"}
         ]
       }
     },
