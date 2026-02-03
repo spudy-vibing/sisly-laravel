@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Sisly;
 
 use Illuminate\Support\ServiceProvider;
+use Sisly\Coaches\CoachRegistry;
+use Sisly\Coaches\PromptLoader;
 use Sisly\Contracts\LLMProviderInterface;
 use Sisly\Contracts\SessionStoreInterface;
 use Sisly\Dispatcher\Dispatcher;
@@ -49,6 +51,7 @@ class SislyServiceProvider extends ServiceProvider
                 stateMachine: $app->make(StateMachine::class),
                 dispatcher: $app->make(Dispatcher::class),
                 handoffDetector: $app->make(HandoffDetector::class),
+                coachRegistry: $app->make(CoachRegistry::class),
             );
         });
 
@@ -153,6 +156,21 @@ class SislyServiceProvider extends ServiceProvider
             return new MockProvider();
         });
 
+        // Prompt Loader
+        $this->app->singleton(PromptLoader::class, function ($app) {
+            $overridePath = $app['config']->get('sisly.prompts.override_path');
+            return new PromptLoader($overridePath);
+        });
+
+        // Coach Registry
+        $this->app->singleton(CoachRegistry::class, function ($app) {
+            return new CoachRegistry(
+                llm: $app->make(LLMProviderInterface::class),
+                promptLoader: $app->make(PromptLoader::class),
+                enabledCoaches: $app['config']->get('sisly.coaches.enabled', []),
+            );
+        });
+
         // Dispatcher
         $this->app->singleton(Dispatcher::class, function ($app) {
             return new Dispatcher(
@@ -187,6 +205,8 @@ class SislyServiceProvider extends ServiceProvider
             PostResponseValidator::class,
             StateMachine::class,
             LLMProviderInterface::class,
+            PromptLoader::class,
+            CoachRegistry::class,
             Dispatcher::class,
             HandoffDetector::class,
         ];

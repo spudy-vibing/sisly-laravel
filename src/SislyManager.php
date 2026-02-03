@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace Sisly;
 
 use Illuminate\Support\Str;
+use Sisly\Coaches\CoachRegistry;
+use Sisly\Contracts\CoachInterface;
 use Sisly\Contracts\SessionStoreInterface;
 use Sisly\Dispatcher\Dispatcher;
 use Sisly\Dispatcher\HandoffDetector;
 use Sisly\DTOs\CoachInfo;
+use Sisly\DTOs\CoETrace;
 use Sisly\DTOs\ConversationTurn;
 use Sisly\DTOs\CrisisInfo;
 use Sisly\DTOs\GeoContext;
@@ -18,6 +21,8 @@ use Sisly\DTOs\SislyResponse;
 use Sisly\Enums\CoachId;
 use Sisly\Enums\SessionState;
 use Sisly\Events\CrisisDetected;
+use Sisly\Events\MessageReceived;
+use Sisly\Events\ResponseGenerated;
 use Sisly\Events\SessionEnded;
 use Sisly\Events\SessionStarted;
 use Sisly\Events\StateTransitioned;
@@ -47,6 +52,7 @@ class SislyManager
         private readonly StateMachine $stateMachine,
         private readonly Dispatcher $dispatcher,
         private readonly HandoffDetector $handoffDetector,
+        private readonly ?CoachRegistry $coachRegistry = null,
     ) {}
 
     /**
@@ -92,13 +98,23 @@ class SislyManager
             }
         }
 
-        // TODO: Phase 5 - Coach processing with CoE engine
+        // Dispatch MessageReceived event
+        $this->dispatchMessageReceivedEvent($session, $message);
 
-        // For now, generate a stub response
-        $responseText = $this->generateStubResponse($session, $message);
+        // Process with coach or use stub
+        $startTime = microtime(true);
+        $coachResult = $this->processWithCoach($session, $message);
+        $responseTimeMs = (int) ((microtime(true) - $startTime) * 1000);
+
+        $responseText = $coachResult['response'];
+        $arabicMirror = $coachResult['arabic_mirror'] ?? null;
+        $coeTrace = $coachResult['coe_trace'] ?? null;
 
         // Validate response before sending
         $responseText = $this->validateAndSanitizeResponse($responseText, $session);
+
+        // Dispatch ResponseGenerated event
+        $this->dispatchResponseGeneratedEvent($session, $responseText, $arabicMirror, $coeTrace, $responseTimeMs);
 
         // Add assistant response
         $session->addTurn(ConversationTurn::assistant($responseText));
@@ -123,6 +139,8 @@ class SislyManager
         return SislyResponse::fromSession(
             session: $session,
             responseText: $responseText,
+            arabicMirror: $arabicMirror,
+            coeTrace: $coeTrace,
         );
     }
 
@@ -179,13 +197,23 @@ class SislyManager
             $handoffSuggested = $handoffResult->suggestedCoach?->value;
         }
 
-        // TODO: Phase 5 - Coach processing
+        // Dispatch MessageReceived event
+        $this->dispatchMessageReceivedEvent($session, $message);
 
-        // Generate stub response
-        $responseText = $this->generateStubResponse($session, $message);
+        // Process with coach or use stub
+        $startTime = microtime(true);
+        $coachResult = $this->processWithCoach($session, $message);
+        $responseTimeMs = (int) ((microtime(true) - $startTime) * 1000);
+
+        $responseText = $coachResult['response'];
+        $arabicMirror = $coachResult['arabic_mirror'] ?? null;
+        $coeTrace = $coachResult['coe_trace'] ?? null;
 
         // Validate response before sending
         $responseText = $this->validateAndSanitizeResponse($responseText, $session);
+
+        // Dispatch ResponseGenerated event
+        $this->dispatchResponseGeneratedEvent($session, $responseText, $arabicMirror, $coeTrace, $responseTimeMs);
 
         // Add assistant turn
         $session->addTurn(ConversationTurn::assistant($responseText));
@@ -214,8 +242,76 @@ class SislyManager
         return SislyResponse::fromSession(
             session: $session,
             responseText: $responseText,
+            arabicMirror: $arabicMirror,
+            coeTrace: $coeTrace,
             handoffSuggested: $handoffSuggested,
         );
+    }
+
+    /**
+     * Process a message with the appropriate coach.
+     *
+     * @return array{response: string, arabic_mirror: ?string, coe_trace: ?CoETrace}
+     */
+    private function processWithCoach(Session $session, string $message): array
+    {
+        // If coach registry is available, use it
+        if ($this->coachRegistry !== null) {
+            try {
+                $coach = $this->coachRegistry->get($session->coachId);
+                return $coach->process($session, $message);
+            } catch (\Throwable $e) {
+                // Log error and fall back to stub
+                // TODO: Add proper logging
+            }
+        }
+
+        // Fall back to stub response
+        return [
+            'response' => $this->generateStubResponse($session, $message),
+            'arabic_mirror' => null,
+            'coe_trace' => null,
+        ];
+    }
+
+    /**
+     * Dispatch the MessageReceived event.
+     */
+    private function dispatchMessageReceivedEvent(Session $session, string $message): void
+    {
+        $event = MessageReceived::create(
+            sessionId: $session->id,
+            message: $message,
+            coachId: $session->coachId,
+            state: $session->state,
+            turnCount: $session->turnCount,
+        );
+
+        event($event);
+    }
+
+    /**
+     * Dispatch the ResponseGenerated event.
+     */
+    private function dispatchResponseGeneratedEvent(
+        Session $session,
+        string $response,
+        ?string $arabicMirror,
+        ?CoETrace $coeTrace,
+        int $responseTimeMs,
+    ): void {
+        $event = ResponseGenerated::create(
+            sessionId: $session->id,
+            response: $response,
+            arabicMirror: $arabicMirror,
+            coachId: $session->coachId,
+            state: $session->state,
+            turnCount: $session->turnCount,
+            coeTrace: $coeTrace,
+            responseTimeMs: $responseTimeMs,
+        );
+
+        event($event);
     }
 
     /**
