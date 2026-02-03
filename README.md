@@ -47,8 +47,8 @@ Sisly is a Laravel package that provides AI-powered emotional coaching through f
 
 ### Requirements
 
-- PHP 8.1 or higher
-- Laravel 10.x or 11.x
+- PHP 8.2 or higher
+- Laravel 10.x, 11.x, or 12.x
 - OpenAI API key and/or Google Gemini API key
 
 ### Install via Composer
@@ -92,27 +92,33 @@ SISLY_LLM_FAILOVER=true
 ```php
 use Sisly\Facades\Sisly;
 
-// Start a new coaching session
+// Start a new coaching session (session ID is auto-generated)
 $response = Sisly::startSession(
-    sessionId: 'user-123',
-    message: "I've been feeling really anxious about my presentation tomorrow"
+    message: "I've been feeling really anxious about my presentation tomorrow",
+    context: [
+        'coach' => 'meetly',      // Optional: force specific coach
+        'country' => 'AE',        // Optional: for crisis resources
+    ]
 );
 
-echo $response->content;
+// Get the session ID from the response for subsequent calls
+$sessionId = $response->sessionId;
+
+echo $response->responseText;
 // "I hear you - presentations can bring up a lot of anxiety..."
 
 echo $response->arabicMirror;
 // "أسمعك - العروض التقديمية ممكن تسبب قلق كبير..."
 
-// Continue the conversation
-$response = Sisly::message('user-123', "Yes, I keep thinking about everything that could go wrong");
+// Continue the conversation using the session ID
+$response = Sisly::message($sessionId, "Yes, I keep thinking about everything that could go wrong");
 
 // Check session state
-$state = Sisly::getState('user-123');
-echo $state->value; // "exploration"
+$state = Sisly::getState($sessionId);
+echo $state['state']; // "exploration"
 
 // End session
-Sisly::endSession('user-123');
+Sisly::endSession($sessionId);
 ```
 
 ### Using Dependency Injection
@@ -126,18 +132,36 @@ class CoachingController extends Controller
         private SislyManager $sisly
     ) {}
 
+    public function start(Request $request)
+    {
+        $response = $this->sisly->startSession(
+            message: $request->input('message'),
+            context: [
+                'country' => $request->input('country', 'AE'),
+            ]
+        );
+
+        return response()->json([
+            'session_id' => $response->sessionId,
+            'message' => $response->responseText,
+            'arabic' => $response->arabicMirror,
+            'state' => $response->state->value,
+            'coach' => $response->coachName,
+        ]);
+    }
+
     public function chat(Request $request)
     {
         $response = $this->sisly->message(
-            sessionId: $request->session()->getId(),
+            sessionId: $request->input('session_id'),
             message: $request->input('message')
         );
 
         return response()->json([
-            'message' => $response->content,
+            'message' => $response->responseText,
             'arabic' => $response->arabicMirror,
             'state' => $response->state->value,
-            'coach' => $response->coach,
+            'coach' => $response->coachName,
         ]);
     }
 }
@@ -299,9 +323,9 @@ $detector->containsArabic('Hello أحمد');  // true
 Every response includes an Arabic translation using Gulf dialect:
 
 ```php
-$response = Sisly::message('user-123', "I feel overwhelmed");
+$response = Sisly::message($sessionId, "I feel overwhelmed");
 
-echo $response->content;
+echo $response->responseText;
 // "It sounds like you have a lot on your plate right now..."
 
 echo $response->arabicMirror;
@@ -383,19 +407,18 @@ See [CONFIGURATION.md](docs/CONFIGURATION.md) for detailed documentation.
 ```php
 use Sisly\Facades\Sisly;
 
-// Start a new session
+// Start a new session (session ID is auto-generated)
 Sisly::startSession(
-    string $sessionId,
     string $message,
-    ?string $coachId = null,
-    ?array $preferences = []
+    array $context = []   // Optional: ['coach' => 'meetly', 'country' => 'AE']
 ): SislyResponse;
 
 // Send a message to existing session
 Sisly::message(string $sessionId, string $message): SislyResponse;
 
 // Get current session state
-Sisly::getState(string $sessionId): SessionState;
+Sisly::getState(string $sessionId): array;
+// Returns: ['state' => 'exploration', 'turn_count' => 2, 'coach' => 'meetly', ...]
 
 // End a session
 Sisly::endSession(string $sessionId): void;
@@ -409,15 +432,18 @@ Sisly::sessionExists(string $sessionId): bool;
 ```php
 class SislyResponse
 {
-    public bool $success;
-    public string $content;           // English response
-    public ?string $arabicMirror;     // Arabic translation
-    public SessionState $state;       // Current state
-    public string $coach;             // Active coach ID
-    public bool $isCrisis;            // Crisis detected?
-    public ?CrisisInfo $crisisInfo;   // Crisis details if detected
-    public int $turnCount;            // Current turn number
-    public array $metadata;           // Additional data
+    public string $sessionId;              // Unique session identifier
+    public CoachId $coachId;               // Coach enum
+    public string $coachName;              // Coach display name
+    public string $responseText;           // English response
+    public ?string $arabicMirror;          // Arabic translation
+    public SessionState $state;            // Current FSM state
+    public int $turnCount;                 // Current turn number
+    public CrisisInfo $crisis;             // Crisis info (check $crisis->detected)
+    public ?CoETrace $coeTrace;            // Chain of Empathy reasoning trace
+    public bool $sessionComplete;          // Is session finished?
+    public ?string $handoffSuggested;      // Suggested coach handoff
+    public DateTimeImmutable $timestamp;   // Response timestamp
 }
 ```
 
