@@ -12,7 +12,10 @@ use Sisly\Contracts\SessionStoreInterface;
 use Sisly\Dispatcher\Dispatcher;
 use Sisly\Dispatcher\HandoffDetector;
 use Sisly\FSM\StateMachine;
+use Sisly\LLM\LLMManager;
 use Sisly\LLM\MockProvider;
+use Sisly\LLM\Providers\GeminiProvider;
+use Sisly\LLM\Providers\OpenAIProvider;
 use Sisly\Safety\CrisisDetector;
 use Sisly\Safety\CrisisHandler;
 use Sisly\Safety\CrisisResourceProvider;
@@ -150,10 +153,49 @@ class SislyServiceProvider extends ServiceProvider
             );
         });
 
-        // LLM Provider (MockProvider for testing, real providers in Phase 6)
+        // LLM Provider with failover support
         $this->app->singleton(LLMProviderInterface::class, function ($app) {
-            // TODO: Phase 6 - Add OpenAI and Gemini providers
-            return new MockProvider();
+            $driver = $app['config']->get('sisly.llm.driver', 'openai');
+            $failoverEnabled = $app['config']->get('sisly.llm.failover_enabled', true);
+
+            // For mock driver, return MockProvider directly
+            if ($driver === 'mock') {
+                return new MockProvider();
+            }
+
+            // Create the primary provider
+            $primaryProvider = $this->createLLMProvider($driver, $app);
+
+            // If failover is disabled, return primary provider directly
+            if (!$failoverEnabled) {
+                return $primaryProvider;
+            }
+
+            // Create LLM Manager with failover
+            $failureThreshold = $app['config']->get('sisly.llm.failure_threshold', 5);
+            $manager = new LLMManager([], true, $failureThreshold);
+
+            // Add primary provider
+            $manager->addProvider($primaryProvider);
+
+            // Add fallback provider (opposite of primary)
+            $fallbackDriver = $driver === 'openai' ? 'gemini' : 'openai';
+            $fallbackProvider = $this->createLLMProvider($fallbackDriver, $app);
+
+            if ($fallbackProvider->isAvailable()) {
+                $manager->addProvider($fallbackProvider);
+            }
+
+            return $manager;
+        });
+
+        // Register individual providers for direct access
+        $this->app->singleton(OpenAIProvider::class, function ($app) {
+            return $this->createLLMProvider('openai', $app);
+        });
+
+        $this->app->singleton(GeminiProvider::class, function ($app) {
+            return $this->createLLMProvider('gemini', $app);
         });
 
         // Prompt Loader
@@ -189,6 +231,21 @@ class SislyServiceProvider extends ServiceProvider
     }
 
     /**
+     * Create an LLM provider instance.
+     *
+     * @param \Illuminate\Foundation\Application $app
+     */
+    protected function createLLMProvider(string $driver, $app): LLMProviderInterface
+    {
+        return match ($driver) {
+            'openai' => new OpenAIProvider($app['config']->get('sisly.llm.openai', [])),
+            'gemini' => new GeminiProvider($app['config']->get('sisly.llm.gemini', [])),
+            'mock' => new MockProvider(),
+            default => new MockProvider(),
+        };
+    }
+
+    /**
      * Get the services provided by the provider.
      *
      * @return array<string>
@@ -205,6 +262,9 @@ class SislyServiceProvider extends ServiceProvider
             PostResponseValidator::class,
             StateMachine::class,
             LLMProviderInterface::class,
+            OpenAIProvider::class,
+            GeminiProvider::class,
+            LLMManager::class,
             PromptLoader::class,
             CoachRegistry::class,
             Dispatcher::class,

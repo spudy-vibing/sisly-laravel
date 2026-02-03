@@ -11,20 +11,53 @@ return [
     | Configure the primary and fallback LLM providers. The system will
     | automatically fail over to the fallback provider if the primary fails.
     |
+    | Supported providers: "openai", "gemini", "mock"
+    |
     */
     'llm' => [
-        'primary' => [
-            'provider' => env('SISLY_LLM_PRIMARY', 'openai'),
-            'model' => env('SISLY_LLM_MODEL', 'gpt-4-turbo'),
+        // Provider to use: "openai", "gemini", or "mock" for testing
+        'driver' => env('SISLY_LLM_DRIVER', 'openai'),
+
+        // Enable failover to backup provider
+        'failover_enabled' => env('SISLY_LLM_FAILOVER', true),
+
+        // Number of failures before circuit breaker trips
+        'failure_threshold' => env('SISLY_LLM_FAILURE_THRESHOLD', 5),
+
+        // OpenAI configuration
+        'openai' => [
             'api_key' => env('OPENAI_API_KEY'),
+            'model' => env('OPENAI_MODEL', 'gpt-4-turbo'),
+            'timeout' => env('OPENAI_TIMEOUT', 30),
+            'max_retries' => env('OPENAI_MAX_RETRIES', 3),
+            'retry_delay' => env('OPENAI_RETRY_DELAY', 1000), // milliseconds
         ],
-        'fallback' => [
-            'provider' => env('SISLY_LLM_FALLBACK', 'gemini'),
-            'model' => env('SISLY_LLM_FALLBACK_MODEL', 'gemini-pro'),
+
+        // Google Gemini configuration
+        'gemini' => [
             'api_key' => env('GEMINI_API_KEY'),
+            'model' => env('GEMINI_MODEL', 'gemini-pro'),
+            'timeout' => env('GEMINI_TIMEOUT', 30),
+            'max_retries' => env('GEMINI_MAX_RETRIES', 3),
+            'retry_delay' => env('GEMINI_RETRY_DELAY', 1000), // milliseconds
         ],
-        'timeout' => env('SISLY_LLM_TIMEOUT', 30),
-        'retry_attempts' => env('SISLY_LLM_RETRIES', 2),
+
+        // Temperature settings per session state
+        'temperature' => [
+            'intake' => 0.7,
+            'exploration' => 0.7,
+            'deepening' => 0.6,
+            'problem_solving' => 0.5,
+            'closing' => 0.6,
+            'crisis_intervention' => 0.0, // Deterministic for safety
+        ],
+
+        // Token limits
+        'max_tokens' => [
+            'default' => 150,
+            'technique' => 300, // Technique instructions can be longer
+            'crisis' => 200,
+        ],
     ],
 
     /*
