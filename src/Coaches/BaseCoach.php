@@ -98,6 +98,15 @@ PROMPT;
         ]);
 
         if (!$response->success) {
+            // Log the error for debugging (only in Laravel context)
+            if (function_exists('app') && app()->bound('log')) {
+                app('log')->error('Sisly LLM call failed', [
+                    'error' => $response->error,
+                    'session_id' => $session->id,
+                    'state' => $session->state->value,
+                    'provider' => $this->llm->getName(),
+                ]);
+            }
             return $this->getFallbackResponse($session->state);
         }
 

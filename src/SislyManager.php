@@ -261,8 +261,15 @@ class SislyManager
                 $coach = $this->coachRegistry->get($session->coachId);
                 return $coach->process($session, $message);
             } catch (\Throwable $e) {
-                // Log error and fall back to stub
-                // TODO: Add proper logging
+                // Log error for debugging (only in Laravel context)
+                if (function_exists('app') && app()->bound('log')) {
+                    app('log')->error('Sisly coach processing failed', [
+                        'error' => $e->getMessage(),
+                        'session_id' => $session->id,
+                        'coach' => $session->coachId->value,
+                    ]);
+                }
+                // Fall through to stub response
             }
         }
 
