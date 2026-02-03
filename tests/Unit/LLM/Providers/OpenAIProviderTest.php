@@ -4,23 +4,58 @@ declare(strict_types=1);
 
 namespace Sisly\Tests\Unit\LLM\Providers;
 
-use Illuminate\Support\Facades\Http;
+use GuzzleHttp\Client;
+use GuzzleHttp\Handler\MockHandler;
+use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Psr7\Response;
+use GuzzleHttp\Middleware;
 use Sisly\LLM\Providers\OpenAIProvider;
 use Sisly\Tests\TestCase;
 
 class OpenAIProviderTest extends TestCase
 {
     private OpenAIProvider $provider;
+    private array $requestHistory = [];
 
     protected function setUp(): void
     {
         parent::setUp();
+        $this->requestHistory = [];
         $this->provider = new OpenAIProvider([
             'api_key' => 'test-api-key',
             'model' => 'gpt-4-turbo',
             'timeout' => 30,
             'max_retries' => 1, // Reduce retries for faster tests
         ]);
+    }
+
+    private function createMockClient(array $responses): Client
+    {
+        $mock = new MockHandler($responses);
+        $handlerStack = HandlerStack::create($mock);
+
+        // Add history middleware to track requests
+        $history = Middleware::history($this->requestHistory);
+        $handlerStack->push($history);
+
+        return new Client(['handler' => $handlerStack]);
+    }
+
+    private function createSuccessResponse(string $content = 'Test response'): Response
+    {
+        return new Response(200, [], json_encode([
+            'choices' => [
+                [
+                    'message' => ['content' => $content],
+                    'finish_reason' => 'stop',
+                ],
+            ],
+            'usage' => [
+                'prompt_tokens' => 10,
+                'completion_tokens' => 5,
+            ],
+            'model' => 'gpt-4-turbo',
+        ]));
     }
 
     public function test_get_name_returns_openai(): void
@@ -50,23 +85,16 @@ class OpenAIProviderTest extends TestCase
 
     public function test_generate_sends_correct_request(): void
     {
-        Http::fake([
-            'api.openai.com/*' => Http::response([
-                'choices' => [
-                    [
-                        'message' => ['content' => 'Test response'],
-                        'finish_reason' => 'stop',
-                    ],
-                ],
-                'usage' => [
-                    'prompt_tokens' => 10,
-                    'completion_tokens' => 5,
-                ],
-                'model' => 'gpt-4-turbo',
-            ], 200),
+        $client = $this->createMockClient([
+            $this->createSuccessResponse('Test response'),
         ]);
 
-        $response = $this->provider->generate('Hello');
+        $provider = new OpenAIProvider([
+            'api_key' => 'test-api-key',
+            'model' => 'gpt-4-turbo',
+        ], $client);
+
+        $response = $provider->generate('Hello');
 
         $this->assertTrue($response->success);
         $this->assertEquals('Test response', $response->content);
@@ -77,49 +105,44 @@ class OpenAIProviderTest extends TestCase
 
     public function test_chat_sends_messages_with_system_prompt(): void
     {
-        Http::fake([
-            'api.openai.com/*' => Http::response([
-                'choices' => [
-                    ['message' => ['content' => 'Response'], 'finish_reason' => 'stop'],
-                ],
-                'usage' => ['prompt_tokens' => 20, 'completion_tokens' => 10],
-                'model' => 'gpt-4-turbo',
-            ], 200),
+        $client = $this->createMockClient([
+            $this->createSuccessResponse('Response'),
         ]);
+
+        $provider = new OpenAIProvider([
+            'api_key' => 'test-api-key',
+            'model' => 'gpt-4-turbo',
+        ], $client);
 
         $messages = [
             ['role' => 'user', 'content' => 'I am anxious'],
         ];
 
-        $response = $this->provider->chat($messages, 'You are a coach');
+        $response = $provider->chat($messages, 'You are a coach');
 
         $this->assertTrue($response->success);
 
         // Verify request was made with correct format
-        Http::assertSent(function ($request) {
-            $body = $request->data();
-            return isset($body['messages']) &&
-                   $body['messages'][0]['role'] === 'system' &&
-                   $body['messages'][0]['content'] === 'You are a coach';
-        });
+        $this->assertCount(1, $this->requestHistory);
+        $request = $this->requestHistory[0]['request'];
+        $body = json_decode($request->getBody()->getContents(), true);
+
+        $this->assertEquals('system', $body['messages'][0]['role']);
+        $this->assertEquals('You are a coach', $body['messages'][0]['content']);
     }
 
     public function test_handles_rate_limiting(): void
     {
-        Http::fake([
-            'api.openai.com/*' => Http::sequence()
-                ->push(['error' => ['message' => 'Rate limited']], 429)
-                ->push([
-                    'choices' => [['message' => ['content' => 'Success']]],
-                    'model' => 'gpt-4-turbo',
-                ], 200),
+        $client = $this->createMockClient([
+            new Response(429, ['Retry-After' => '1'], json_encode(['error' => ['message' => 'Rate limited']])),
+            $this->createSuccessResponse('Success'),
         ]);
 
         $provider = new OpenAIProvider([
             'api_key' => 'test-key',
             'max_retries' => 2,
             'retry_delay' => 10,
-        ]);
+        ], $client);
 
         $response = $provider->generate('Test');
 
@@ -129,20 +152,16 @@ class OpenAIProviderTest extends TestCase
 
     public function test_handles_server_error_with_retry(): void
     {
-        Http::fake([
-            'api.openai.com/*' => Http::sequence()
-                ->push(['error' => ['message' => 'Server error']], 500)
-                ->push([
-                    'choices' => [['message' => ['content' => 'Success']]],
-                    'model' => 'gpt-4-turbo',
-                ], 200),
+        $client = $this->createMockClient([
+            new Response(500, [], json_encode(['error' => ['message' => 'Server error']])),
+            $this->createSuccessResponse('Success'),
         ]);
 
         $provider = new OpenAIProvider([
             'api_key' => 'test-key',
             'max_retries' => 2,
             'retry_delay' => 10,
-        ]);
+        ], $client);
 
         $response = $provider->generate('Test');
 
@@ -151,13 +170,15 @@ class OpenAIProviderTest extends TestCase
 
     public function test_handles_client_error_without_retry(): void
     {
-        Http::fake([
-            'api.openai.com/*' => Http::response([
-                'error' => ['message' => 'Invalid API key'],
-            ], 401),
+        $client = $this->createMockClient([
+            new Response(401, [], json_encode(['error' => ['message' => 'Invalid API key']])),
         ]);
 
-        $response = $this->provider->generate('Test');
+        $provider = new OpenAIProvider([
+            'api_key' => 'test-api-key',
+        ], $client);
+
+        $response = $provider->generate('Test');
 
         $this->assertFalse($response->success);
         $this->assertStringContainsString('Invalid API key', $response->error);
@@ -165,14 +186,18 @@ class OpenAIProviderTest extends TestCase
 
     public function test_handles_empty_choices(): void
     {
-        Http::fake([
-            'api.openai.com/*' => Http::response([
+        $client = $this->createMockClient([
+            new Response(200, [], json_encode([
                 'choices' => [],
                 'model' => 'gpt-4-turbo',
-            ], 200),
+            ])),
         ]);
 
-        $response = $this->provider->generate('Test');
+        $provider = new OpenAIProvider([
+            'api_key' => 'test-api-key',
+        ], $client);
+
+        $response = $provider->generate('Test');
 
         $this->assertFalse($response->success);
         $this->assertStringContainsString('no choices', $response->error);
@@ -180,34 +205,40 @@ class OpenAIProviderTest extends TestCase
 
     public function test_respects_temperature_option(): void
     {
-        Http::fake([
-            'api.openai.com/*' => Http::response([
-                'choices' => [['message' => ['content' => 'Response']]],
-                'model' => 'gpt-4-turbo',
-            ], 200),
+        $client = $this->createMockClient([
+            $this->createSuccessResponse('Response'),
         ]);
 
-        $this->provider->generate('Test', ['temperature' => 0.0]);
+        $provider = new OpenAIProvider([
+            'api_key' => 'test-api-key',
+        ], $client);
 
-        Http::assertSent(function ($request) {
-            return $request->data()['temperature'] === 0.0;
-        });
+        $provider->generate('Test', ['temperature' => 0.0]);
+
+        $this->assertCount(1, $this->requestHistory);
+        $request = $this->requestHistory[0]['request'];
+        $body = json_decode($request->getBody()->getContents(), true);
+
+        $this->assertEquals(0.0, $body['temperature']);
     }
 
     public function test_respects_max_tokens_option(): void
     {
-        Http::fake([
-            'api.openai.com/*' => Http::response([
-                'choices' => [['message' => ['content' => 'Response']]],
-                'model' => 'gpt-4-turbo',
-            ], 200),
+        $client = $this->createMockClient([
+            $this->createSuccessResponse('Response'),
         ]);
 
-        $this->provider->generate('Test', ['max_tokens' => 500]);
+        $provider = new OpenAIProvider([
+            'api_key' => 'test-api-key',
+        ], $client);
 
-        Http::assertSent(function ($request) {
-            return $request->data()['max_tokens'] === 500;
-        });
+        $provider->generate('Test', ['max_tokens' => 500]);
+
+        $this->assertCount(1, $this->requestHistory);
+        $request = $this->requestHistory[0]['request'];
+        $body = json_decode($request->getBody()->getContents(), true);
+
+        $this->assertEquals(500, $body['max_tokens']);
     }
 
     public function test_get_model_returns_configured_model(): void

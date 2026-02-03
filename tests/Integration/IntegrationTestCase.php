@@ -26,11 +26,48 @@ abstract class IntegrationTestCase extends TestCase
 
     protected function setUp(): void
     {
+        // Load .env.testing file if it exists (before parent::setUp)
+        $this->loadEnvTestingFile();
+
         parent::setUp();
 
         // Load API keys from environment
         $this->openaiApiKey = $this->getEnvKey('OPENAI_API_KEY');
         $this->geminiApiKey = $this->getEnvKey('GEMINI_API_KEY');
+    }
+
+    /**
+     * Load the .env.testing file if it exists.
+     */
+    protected function loadEnvTestingFile(): void
+    {
+        $envFile = dirname(__DIR__, 2) . '/.env.testing';
+
+        if (!file_exists($envFile)) {
+            return;
+        }
+
+        $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+
+        foreach ($lines as $line) {
+            // Skip comments
+            if (str_starts_with(trim($line), '#')) {
+                continue;
+            }
+
+            // Parse KEY=value
+            if (str_contains($line, '=')) {
+                [$key, $value] = explode('=', $line, 2);
+                $key = trim($key);
+                $value = trim($value);
+
+                // Only set if not already set in environment
+                if (empty(getenv($key))) {
+                    putenv("{$key}={$value}");
+                    $_ENV[$key] = $value;
+                }
+            }
+        }
     }
 
     /**

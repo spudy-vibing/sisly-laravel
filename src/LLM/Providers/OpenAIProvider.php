@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace Sisly\LLM\Providers;
 
-use Illuminate\Http\Client\PendingRequest;
-use Illuminate\Support\Facades\Http;
+use GuzzleHttp\Client;
+use GuzzleHttp\Exception\RequestException;
+use GuzzleHttp\Exception\ConnectException;
 use Sisly\Contracts\LLMProviderInterface;
 use Sisly\LLM\LLMResponse;
 
@@ -13,6 +14,7 @@ use Sisly\LLM\LLMResponse;
  * OpenAI API provider for LLM completions.
  *
  * Supports GPT-4, GPT-4-turbo, GPT-3.5-turbo models.
+ * Uses Guzzle directly for compatibility outside Laravel context.
  */
 class OpenAIProvider implements LLMProviderInterface
 {
@@ -27,17 +29,23 @@ class OpenAIProvider implements LLMProviderInterface
     private int $timeout;
     private int $maxRetries;
     private int $retryDelay;
+    private Client $client;
 
     /**
      * @param array<string, mixed> $config
+     * @param Client|null $client Optional Guzzle client for testing
      */
-    public function __construct(array $config = [])
+    public function __construct(array $config = [], ?Client $client = null)
     {
         $this->apiKey = $config['api_key'] ?? '';
         $this->model = $config['model'] ?? self::DEFAULT_MODEL;
         $this->timeout = $config['timeout'] ?? self::DEFAULT_TIMEOUT;
         $this->maxRetries = $config['max_retries'] ?? 3;
         $this->retryDelay = $config['retry_delay'] ?? 1000; // milliseconds
+        $this->client = $client ?? new Client([
+            'timeout' => $this->timeout,
+            'connect_timeout' => 10,
+        ]);
     }
 
     /**
@@ -141,34 +149,44 @@ class OpenAIProvider implements LLMProviderInterface
         for ($attempt = 1; $attempt <= $this->maxRetries; $attempt++) {
             try {
                 $response = $this->makeRequest($payload);
+                $statusCode = $response['status'];
+                $body = $response['body'];
 
-                if ($response->successful()) {
-                    return $this->parseResponse($response->json());
+                if ($statusCode >= 200 && $statusCode < 300) {
+                    return $this->parseResponse($body);
                 }
 
                 // Handle rate limiting
-                if ($response->status() === 429) {
-                    $retryAfter = $response->header('Retry-After');
+                if ($statusCode === 429) {
+                    $retryAfter = $response['headers']['Retry-After'][0] ?? null;
                     $delay = $retryAfter ? (int) $retryAfter * 1000 : $this->getBackoffDelay($attempt);
                     usleep($delay * 1000);
                     continue;
                 }
 
                 // Handle server errors (5xx) with retry
-                if ($response->status() >= 500) {
-                    $lastError = "OpenAI server error: {$response->status()}";
+                if ($statusCode >= 500) {
+                    $lastError = "OpenAI server error: {$statusCode}";
                     usleep($this->getBackoffDelay($attempt) * 1000);
                     continue;
                 }
 
                 // Client errors (4xx) don't retry
-                $body = $response->json();
-                $errorMessage = $body['error']['message'] ?? "HTTP {$response->status()}";
+                $errorMessage = $body['error']['message'] ?? "HTTP {$statusCode}";
                 return LLMResponse::failure("OpenAI error: {$errorMessage}");
 
+            } catch (ConnectException $e) {
+                $lastError = "Connection failed: " . $e->getMessage();
+                if ($attempt < $this->maxRetries) {
+                    usleep($this->getBackoffDelay($attempt) * 1000);
+                }
+            } catch (RequestException $e) {
+                $lastError = $e->getMessage();
+                if ($attempt < $this->maxRetries) {
+                    usleep($this->getBackoffDelay($attempt) * 1000);
+                }
             } catch (\Throwable $e) {
                 $lastError = $e->getMessage();
-
                 if ($attempt < $this->maxRetries) {
                     usleep($this->getBackoffDelay($attempt) * 1000);
                 }
@@ -179,18 +197,29 @@ class OpenAIProvider implements LLMProviderInterface
     }
 
     /**
-     * Make the HTTP request to OpenAI.
+     * Make the HTTP request to OpenAI using Guzzle.
      *
      * @param array<string, mixed> $payload
+     * @return array{status: int, body: array<string, mixed>, headers: array<string, array<string>>}
      */
-    private function makeRequest(array $payload): \Illuminate\Http\Client\Response
+    private function makeRequest(array $payload): array
     {
-        return Http::withHeaders([
-            'Authorization' => "Bearer {$this->apiKey}",
-            'Content-Type' => 'application/json',
-        ])
-            ->timeout($this->timeout)
-            ->post(self::API_URL, $payload);
+        $response = $this->client->post(self::API_URL, [
+            'headers' => [
+                'Authorization' => "Bearer {$this->apiKey}",
+                'Content-Type' => 'application/json',
+            ],
+            'json' => $payload,
+            'http_errors' => false, // Don't throw on 4xx/5xx
+        ]);
+
+        $body = json_decode($response->getBody()->getContents(), true) ?? [];
+
+        return [
+            'status' => $response->getStatusCode(),
+            'body' => $body,
+            'headers' => $response->getHeaders(),
+        ];
     }
 
     /**
