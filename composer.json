@@ -61,6 +61,9 @@
     "prefer-stable": true,
     "scripts": {
         "test": "vendor/bin/phpunit",
+        "test:unit": "vendor/bin/phpunit --testsuite Unit",
+        "test:integration": "vendor/bin/phpunit --testsuite Integration",
+        "test:all": "vendor/bin/phpunit --testsuite All",
         "analyse": "vendor/bin/phpstan analyse",
         "format": "vendor/bin/pint"
     }

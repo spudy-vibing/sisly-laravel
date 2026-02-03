@@ -477,7 +477,7 @@ Event::listen(CrisisDetected::class, function ($event) {
 ### Run Tests
 
 ```bash
-# Run all tests
+# Run unit tests (default, no API keys required)
 composer test
 
 # Run with coverage
@@ -486,6 +486,31 @@ composer test
 # Run specific test suite
 ./vendor/bin/phpunit tests/Unit/Safety/
 ```
+
+### Integration Tests (Live LLM)
+
+Integration tests make real API calls to test full conversation flows. They are **skipped by default** and only run when API keys are configured.
+
+```bash
+# 1. Copy the example environment file
+cp .env.testing.example .env.testing
+
+# 2. Add your API keys to .env.testing
+# OPENAI_API_KEY=sk-your-key-here
+
+# 3. Run integration tests
+composer test:integration
+
+# Or run with environment variable directly
+OPENAI_API_KEY=sk-xxx ./vendor/bin/phpunit --testsuite Integration
+```
+
+Integration tests verify:
+- Live OpenAI/Gemini API connectivity
+- Full conversation flows with real LLM responses
+- Multi-turn context preservation
+- Arabic mirror generation
+- Response quality (not generic fallbacks)
 
 ### Test with Mock Provider
 
