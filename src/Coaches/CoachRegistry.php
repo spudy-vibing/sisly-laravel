@@ -107,11 +107,10 @@ class CoachRegistry
 
         return match ($coachId) {
             CoachId::MEETLY => new MeetlyCoach($this->llm, $promptLoader),
-            // TODO: Add other coaches as they are implemented
-            CoachId::VENTO => new MeetlyCoach($this->llm, $promptLoader), // Temporary fallback
-            CoachId::LOOPY => new MeetlyCoach($this->llm, $promptLoader), // Temporary fallback
-            CoachId::PRESSO => new MeetlyCoach($this->llm, $promptLoader), // Temporary fallback
-            CoachId::BOOSTLY => new MeetlyCoach($this->llm, $promptLoader), // Temporary fallback
+            CoachId::VENTO => new VentoCoach($this->llm, $promptLoader),
+            CoachId::LOOPY => new LoopyCoach($this->llm, $promptLoader),
+            CoachId::PRESSO => new PressoCoach($this->llm, $promptLoader),
+            CoachId::BOOSTLY => new BoostlyCoach($this->llm, $promptLoader),
         };
     }
 }

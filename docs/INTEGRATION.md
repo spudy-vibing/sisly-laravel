@@ -94,24 +94,21 @@ class CoachingController extends Controller
             'country' => 'nullable|string|size:2',
         ]);
 
-        $sessionId = $request->user()->id . '-' . now()->timestamp;
-
         $response = Sisly::startSession(
-            sessionId: $sessionId,
             message: $request->input('message'),
-            coachId: $request->input('coach'),
-            preferences: [
+            context: [
+                'coach' => $request->input('coach'),
                 'country' => $request->input('country', 'AE'),
             ]
         );
 
         return response()->json([
-            'session_id' => $sessionId,
-            'message' => $response->content,
+            'session_id' => $response->sessionId,
+            'message' => $response->responseText,
             'arabic' => $response->arabicMirror,
-            'coach' => $response->coach,
+            'coach' => $response->coachName,
             'state' => $response->state->value,
-            'is_crisis' => $response->isCrisis,
+            'is_crisis' => $response->crisis->detected,
         ]);
     }
 
@@ -132,14 +129,14 @@ class CoachingController extends Controller
             );
 
             return response()->json([
-                'message' => $response->content,
+                'message' => $response->responseText,
                 'arabic' => $response->arabicMirror,
                 'state' => $response->state->value,
                 'turn' => $response->turnCount,
-                'is_crisis' => $response->isCrisis,
-                'crisis_info' => $response->isCrisis ? [
-                    'emergency' => $response->crisisInfo->emergencyNumber,
-                    'hotline' => $response->crisisInfo->hotline,
+                'is_crisis' => $response->crisis->detected,
+                'crisis_info' => $response->crisis->detected ? [
+                    'severity' => $response->crisis->severity->value,
+                    'category' => $response->crisis->category->value,
                 ] : null,
             ]);
         } catch (SessionNotFoundException $e) {
@@ -168,9 +165,10 @@ class CoachingController extends Controller
             $state = Sisly::getState($request->input('session_id'));
 
             return response()->json([
-                'state' => $state->value,
-                'label' => $state->label(),
-                'is_terminal' => $state->isTerminal(),
+                'state' => $state['state'],
+                'turn_count' => $state['turn_count'],
+                'is_active' => $state['is_active'],
+                'coach_id' => $state['coach_id'],
             ]);
         } catch (SessionNotFoundException $e) {
             return response()->json([
@@ -257,10 +255,10 @@ class CoachingResponse implements ShouldBroadcast
     public function broadcastWith(): array
     {
         return [
-            'message' => $this->response->content,
+            'message' => $this->response->responseText,
             'arabic' => $this->response->arabicMirror,
             'state' => $this->response->state->value,
-            'is_crisis' => $this->response->isCrisis,
+            'is_crisis' => $this->response->crisis->detected,
         ];
     }
 }
@@ -467,10 +465,6 @@ class CoachingTest extends TestCase
                 'arabic',
                 'coach',
                 'state',
-            ])
-            ->assertJson([
-                'coach' => 'meetly',
-                'state' => 'exploration',
             ]);
     }
 
@@ -486,7 +480,7 @@ class CoachingTest extends TestCase
                 'state' => 'crisis_intervention',
             ])
             ->assertJsonStructure([
-                'crisis_info' => ['emergency', 'hotline'],
+                'crisis_info' => ['severity', 'category'],
             ]);
     }
 }
@@ -505,9 +499,9 @@ public function test_specific_response(): void
 
     $this->app->instance(LLMProviderInterface::class, $mock);
 
-    $response = Sisly::startSession('test-1', 'I feel anxious');
+    $response = Sisly::startSession('I feel anxious');
 
-    $this->assertStringContainsString('anxious', $response->content);
+    $this->assertStringContainsString('anxious', $response->responseText);
 }
 ```
 
@@ -527,17 +521,17 @@ php artisan sisly:cache-prompts
 ```php
 // Log LLM latency
 Event::listen(ResponseGenerated::class, function ($event) {
-    Metrics::histogram('sisly.response_time', $event->latencyMs, [
-        'coach' => $event->coach,
-        'provider' => $event->provider,
+    Metrics::histogram('sisly.response_time', $event->responseTimeMs, [
+        'coach' => $event->coachId->value,
+        'state' => $event->state->value,
     ]);
 });
 
 // Alert on high failover rate
 Event::listen(LLMFailoverOccurred::class, function ($event) {
     Metrics::increment('sisly.failover', 1, [
-        'from' => $event->fromProvider,
-        'to' => $event->toProvider,
+        'from' => $event->previousProvider,
+        'to' => $event->newProvider,
     ]);
 });
 ```

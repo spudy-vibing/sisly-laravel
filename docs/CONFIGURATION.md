@@ -335,7 +335,7 @@ Sisly validates configuration on boot. Invalid configuration will throw `Configu
 use Sisly\Exceptions\ConfigurationException;
 
 try {
-    $response = Sisly::startSession('user-1', 'Hello');
+    $response = Sisly::startSession('Hello');
 } catch (ConfigurationException $e) {
     echo "Configuration error: " . $e->getConfigKey();
 }

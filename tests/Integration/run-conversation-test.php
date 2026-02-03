@@ -26,6 +26,10 @@ if (file_exists($envFile)) {
 use Sisly\LLM\Providers\OpenAIProvider;
 use Sisly\Coaches\PromptLoader;
 use Sisly\Coaches\MeetlyCoach;
+use Sisly\Coaches\VentoCoach;
+use Sisly\Coaches\LoopyCoach;
+use Sisly\Coaches\PressoCoach;
+use Sisly\Coaches\BoostlyCoach;
 use Sisly\DTOs\Session;
 use Sisly\DTOs\SessionPreferences;
 use Sisly\DTOs\GeoContext;
@@ -67,10 +71,21 @@ $llm = new OpenAIProvider([
 $promptLoader = new PromptLoader();
 $stateMachine = new StateMachine();
 
-// Test scenarios - all use MeetlyCoach (the only implemented coach)
+// Coach factory - maps coach IDs to their classes
+$coachFactory = [
+    'meetly' => fn() => new MeetlyCoach($llm, $promptLoader),
+    'vento' => fn() => new VentoCoach($llm, $promptLoader),
+    'loopy' => fn() => new LoopyCoach($llm, $promptLoader),
+    'presso' => fn() => new PressoCoach($llm, $promptLoader),
+    'boostly' => fn() => new BoostlyCoach($llm, $promptLoader),
+];
+
+// Test scenarios - one per coach
 $scenarios = [
     [
-        'name' => 'Anxiety about Job Interview',
+        'name' => 'MEETLY: Anxiety about Job Interview',
+        'coach' => 'meetly',
+        'coachId' => CoachId::MEETLY,
         'messages' => [
             "I've been feeling really anxious about my job interview tomorrow.",
             "I keep imagining all the ways it could go wrong.",
@@ -80,19 +95,43 @@ $scenarios = [
         ],
     ],
     [
-        'name' => 'Work Stress and Overwhelm',
+        'name' => 'VENTO: Angry at Coworker',
+        'coach' => 'vento',
+        'coachId' => CoachId::VENTO,
         'messages' => [
-            "I'm so stressed out with all my deadlines at work.",
-            "There's just too much to do and not enough time.",
-            "I feel like I'm drowning and can't catch up.",
+            "I'm so furious at my coworker who took credit for my work in front of the whole team.",
+            "He presented my entire project as if he did it himself.",
+            "I have about 1 minute. What can I do with this anger?",
         ],
     ],
     [
-        'name' => 'Social Anxiety',
+        'name' => 'LOOPY: Replaying a Conversation',
+        'coach' => 'loopy',
+        'coachId' => CoachId::LOOPY,
         'messages' => [
-            "I get really nervous at social events. I never know what to say.",
-            "I always worry people are judging me.",
-            "Last week I left a party early because I felt so uncomfortable.",
+            "I can't stop replaying a conversation I had with my manager. I keep thinking about what I should have said.",
+            "It's been three days and my brain won't stop going in circles.",
+            "I have about 1 minute to try something.",
+        ],
+    ],
+    [
+        'name' => 'PRESSO: Deadline Overwhelm',
+        'coach' => 'presso',
+        'coachId' => CoachId::PRESSO,
+        'messages' => [
+            "I'm completely overwhelmed. I have three projects due this week and I can't even start.",
+            "Everything feels urgent and I'm frozen.",
+            "Maybe 30 seconds. I just need to breathe.",
+        ],
+    ],
+    [
+        'name' => 'BOOSTLY: Imposter Syndrome After Promotion',
+        'coach' => 'boostly',
+        'coachId' => CoachId::BOOSTLY,
+        'messages' => [
+            "I just got promoted to team lead but I feel like a total fraud. Everyone else is more qualified.",
+            "I keep comparing myself to my colleague who has 10 years more experience.",
+            "I have about 1 minute. Can you help me feel more grounded?",
         ],
     ],
 ];
@@ -105,16 +144,17 @@ foreach ($scenarios as $scenarioIndex => $scenario) {
 
     echo "Running scenario: " . $scenario['name'] . "\n";
 
-    // Create session
+    // Create session with the appropriate coach
+    $coachId = $scenario['coachId'];
     $session = Session::create(
         id: 'test-' . uniqid(),
-        coachId: CoachId::MEETLY,
+        coachId: $coachId,
         geo: new GeoContext('AE'),
         preferences: new SessionPreferences(arabicMirror: false, includeCoETrace: false),
     );
 
-    // Use MeetlyCoach
-    $coach = new MeetlyCoach($llm, $promptLoader);
+    // Use the coach specified in the scenario
+    $coach = $coachFactory[$scenario['coach']]();
 
     foreach ($scenario['messages'] as $turnIndex => $userMessage) {
         $turnNum = $turnIndex + 1;
@@ -207,7 +247,8 @@ foreach ($scenarios as $scenarioIndex => $scenario) {
             $output[] = "**User:**";
             $output[] = "> {$userMessage}";
             $output[] = "";
-            $output[] = "**Coach (MEETLY):** _{$elapsed}ms_";
+            $coachName = strtoupper($scenario['coach']);
+            $output[] = "**Coach ({$coachName}):** _{$elapsed}ms_";
             $output[] = "> {$response}";
             $output[] = "";
 

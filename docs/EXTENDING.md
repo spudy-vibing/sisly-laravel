@@ -22,18 +22,19 @@ namespace App\Coaching\Coaches;
 
 use Sisly\Coaches\BaseCoach;
 use Sisly\Contracts\CoachInterface;
-use Sisly\DTOs\Session;
+use Sisly\Enums\CoachId;
 use Sisly\Enums\SessionState;
-use Sisly\LLM\LLMResponse;
 
 class GratitudeCoach extends BaseCoach implements CoachInterface
 {
     /**
      * Unique identifier for this coach.
      */
-    public function getId(): string
+    public function getId(): CoachId
     {
-        return 'gratitude';
+        // For custom coaches, you can use an existing CoachId
+        // or extend the enum if needed
+        return CoachId::MEETLY; // Replace with your own enum value
     }
 
     /**
@@ -47,48 +48,25 @@ class GratitudeCoach extends BaseCoach implements CoachInterface
     /**
      * Brief description of what this coach handles.
      */
-    public function getFocus(): string
+    public function getDescription(): string
     {
         return 'Cultivating gratitude and positive mindset';
     }
 
     /**
-     * Keywords that trigger routing to this coach.
+     * System prompt for the coach at a given state.
      */
-    public function getTriggerKeywords(): array
+    public function getSystemPrompt(SessionState $state): string
     {
-        return [
-            'grateful', 'thankful', 'appreciate', 'gratitude',
-            'positive', 'blessings', 'fortunate',
-        ];
+        return 'You are GRATITUDE, a coach specializing in cultivating appreciation and positive mindset.';
     }
 
     /**
-     * Generate a response for the current state.
+     * State-specific prompt.
      */
-    public function respond(Session $session, string $userMessage): LLMResponse
+    public function getStatePrompt(SessionState $state): string
     {
-        $state = $session->currentState;
-        $prompt = $this->buildPrompt($session, $userMessage, $state);
-
-        return $this->llm->chat(
-            messages: $session->getHistoryForLLM(),
-            systemPrompt: $prompt,
-            options: [
-                'temperature' => $this->getTemperature($state),
-                'max_tokens' => $this->getMaxTokens($state),
-            ]
-        );
-    }
-
-    /**
-     * Build the system prompt for a given state.
-     */
-    protected function buildPrompt(Session $session, string $message, SessionState $state): string
-    {
-        $basePrompt = $this->promptLoader->load('global', 'rules');
-
-        $statePrompt = match ($state) {
+        return match ($state) {
             SessionState::INTAKE => $this->getIntakePrompt(),
             SessionState::EXPLORATION => $this->getExplorationPrompt(),
             SessionState::DEEPENING => $this->getDeepeningPrompt(),
@@ -96,8 +74,25 @@ class GratitudeCoach extends BaseCoach implements CoachInterface
             SessionState::CLOSING => $this->getClosingPrompt(),
             default => '',
         };
+    }
 
-        return $basePrompt . "\n\n" . $statePrompt;
+    /**
+     * Emotional domains this coach handles.
+     */
+    public function getDomains(): array
+    {
+        return ['gratitude', 'appreciation', 'positive-mindset'];
+    }
+
+    /**
+     * Keywords that trigger routing to this coach.
+     */
+    public function getTriggers(): array
+    {
+        return [
+            'grateful', 'thankful', 'appreciate', 'gratitude',
+            'positive', 'blessings', 'fortunate',
+        ];
     }
 
     private function getIntakePrompt(): string
@@ -126,7 +121,7 @@ Be curious and supportive. Use reflective listening.
 PROMPT;
     }
 
-    // ... implement other state prompts
+    // ... implement other state prompts similarly
 }
 ```
 
@@ -137,6 +132,7 @@ PROMPT;
 use App\Coaching\Coaches\GratitudeCoach;
 use Sisly\Coaches\CoachRegistry;
 use Sisly\Coaches\PromptLoader;
+use Sisly\CoE\CoEEngine;
 use Sisly\Contracts\LLMProviderInterface;
 
 public function boot(): void
@@ -144,7 +140,8 @@ public function boot(): void
     $this->app->afterResolving(CoachRegistry::class, function (CoachRegistry $registry) {
         $coach = new GratitudeCoach(
             llm: app(LLMProviderInterface::class),
-            promptLoader: app(PromptLoader::class)
+            promptLoader: app(PromptLoader::class),
+            coeEngine: app(CoEEngine::class),
         );
 
         $registry->register($coach);
@@ -203,12 +200,12 @@ class AnthropicProvider implements LLMProviderInterface
     {
         return $this->chat(
             [['role' => 'user', 'content' => $prompt]],
-            null,
+            '',
             $options
         );
     }
 
-    public function chat(array $messages, ?string $systemPrompt = null, array $options = []): LLMResponse
+    public function chat(array $messages, string $systemPrompt = '', array $options = []): LLMResponse
     {
         if (!$this->isAvailable()) {
             return LLMResponse::failure('Anthropic provider not configured');
@@ -446,6 +443,14 @@ resources/sisly/prompts/
 │   ├── deepening.md
 │   ├── technique.md
 │   └── closing.md
+├── vento/
+│   └── ... (same structure)
+├── loopy/
+│   └── ... (same structure)
+├── presso/
+│   └── ... (same structure)
+├── boostly/
+│   └── ... (same structure)
 └── custom-coach/
     └── ... (your custom prompts)
 ```
@@ -482,24 +487,31 @@ Always implement the full interface to ensure compatibility:
 
 ```php
 // Good
-class MyCoach implements CoachInterface
+class MyCoach extends BaseCoach implements CoachInterface
 {
-    public function getId(): string { ... }
+    public function getId(): CoachId { ... }
     public function getName(): string { ... }
-    public function getFocus(): string { ... }
-    public function respond(Session $session, string $message): LLMResponse { ... }
+    public function getDescription(): string { ... }
+    public function getSystemPrompt(SessionState $state): string { ... }
+    public function getStatePrompt(SessionState $state): string { ... }
+    public function getDomains(): array { ... }
+    public function getTriggers(): array { ... }
+    // process() is inherited from BaseCoach
 }
 ```
 
 ### 2. Handle Errors Gracefully
 
+The `BaseCoach::process()` method handles LLM failures automatically with fallback responses. For custom LLM providers, handle errors gracefully:
+
 ```php
-public function respond(Session $session, string $message): LLMResponse
+public function chat(array $messages, string $systemPrompt = '', array $options = []): LLMResponse
 {
     try {
-        return $this->llm->chat(...);
+        // Your LLM call here
+        return LLMResponse::success($content, $promptTokens, $completionTokens, $model);
     } catch (\Throwable $e) {
-        Log::error('Coach error', ['coach' => $this->getId(), 'error' => $e->getMessage()]);
+        Log::error('LLM error', ['provider' => $this->getName(), 'error' => $e->getMessage()]);
         return LLMResponse::failure('An error occurred. Please try again.');
     }
 }
@@ -514,10 +526,10 @@ class GratitudeCoachTest extends TestCase
     {
         $coach = new GratitudeCoach($this->mockLlm, $this->promptLoader);
 
-        $keywords = $coach->getTriggerKeywords();
+        $triggers = $coach->getTriggers();
 
-        $this->assertContains('grateful', $keywords);
-        $this->assertContains('thankful', $keywords);
+        $this->assertContains('grateful', $triggers);
+        $this->assertContains('thankful', $triggers);
     }
 }
 ```

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **PRESSO Coach**: Pressure and overwhelm coach — nervous system regulation, slow pacing, felt vs real urgency (21 tests)
+- **VENTO Coach**: Anger and frustration release coach — safe emotional discharge, validation without fixing (21 tests)
+- **LOOPY Coach**: Rumination and overthinking coach — pattern interruption, present-moment grounding (21 tests)
+- **BOOSTLY Coach**: Self-doubt and imposter syndrome coach — evidence-based competence reconnection (21 tests)
+- All 5 coaches now fully implemented with dedicated classes, prompt files, and test suites
+- CoachRegistry no longer uses MeetlyCoach fallbacks for any coach
+
+### Changed
+- Test count increased from 488 to 572 (1290 assertions)
+- CoachRegistry cleaned up — removed TODO comment and all temporary fallback lines
+
 ## [1.0.0] - 2026-02-02
 
 ### Added
@@ -61,9 +73,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - No personal data stored in logs
 
 ### Technical Details
-- PHP 8.1+ required
-- Laravel 10.x and 11.x supported
-- 513 automated tests with comprehensive coverage
+- PHP 8.2+ required
+- Laravel 10.x, 11.x, and 12.x supported
+- 572 automated tests with 1290 assertions
 - PSR-4 autoloading
 - Strict types throughout
 
@@ -73,7 +85,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | Highlights |
 |---------|------|------------|
-| 1.0.0 | 2026-02-02 | Initial release with MEETLY coach and full GCC support |
+| 1.0.0 | 2026-02-02 | Initial release with MEETLY coach, safety layer, and full GCC support |
 
 ---
 
@@ -106,7 +118,7 @@ If you were using a beta version:
 ## Roadmap
 
 ### 1.1.0 (Planned)
-- [ ] Additional coaches: PRESSO, VENTO, LOOPY, BOOSTLY full implementations
+- [x] Additional coaches: PRESSO, VENTO, LOOPY, BOOSTLY full implementations
 - [ ] Coach handoff between sessions
 - [ ] Analytics dashboard integration
 - [ ] Webhook support for external integrations

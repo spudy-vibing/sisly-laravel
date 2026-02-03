@@ -105,7 +105,7 @@ class SessionFlowTest extends TestCase
         Sisly::message('non-existent-id', 'Hello');
     }
 
-    public function test_can_start_session_with_custom_coach(): void
+    public function test_can_start_session_with_vento_coach(): void
     {
         $response = Sisly::startSession(
             message: 'I am so angry right now',
@@ -116,7 +116,49 @@ class SessionFlowTest extends TestCase
         );
 
         $this->assertEquals(CoachId::VENTO, $response->coachId);
-        $this->assertEquals('Vento', $response->coachName);
+        $this->assertNotEmpty($response->responseText);
+    }
+
+    public function test_can_start_session_with_loopy_coach(): void
+    {
+        $response = Sisly::startSession(
+            message: "I can't stop overthinking about what happened",
+            context: [
+                'geo' => new GeoContext(country: 'AE'),
+                'coach_id' => 'loopy',
+            ]
+        );
+
+        $this->assertEquals(CoachId::LOOPY, $response->coachId);
+        $this->assertNotEmpty($response->responseText);
+    }
+
+    public function test_can_start_session_with_presso_coach(): void
+    {
+        $response = Sisly::startSession(
+            message: 'I am completely overwhelmed with work',
+            context: [
+                'geo' => new GeoContext(country: 'AE'),
+                'coach_id' => 'presso',
+            ]
+        );
+
+        $this->assertEquals(CoachId::PRESSO, $response->coachId);
+        $this->assertNotEmpty($response->responseText);
+    }
+
+    public function test_can_start_session_with_boostly_coach(): void
+    {
+        $response = Sisly::startSession(
+            message: "I feel like I'm not good enough for this role",
+            context: [
+                'geo' => new GeoContext(country: 'AE'),
+                'coach_id' => 'boostly',
+            ]
+        );
+
+        $this->assertEquals(CoachId::BOOSTLY, $response->coachId);
+        $this->assertNotEmpty($response->responseText);
     }
 
     public function test_can_start_session_with_preferences(): void

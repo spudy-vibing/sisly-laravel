@@ -19,9 +19,9 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/PHP-8.1%2B-777BB4?logo=php" alt="PHP 8.1+"/>
-  <img src="https://img.shields.io/badge/Laravel-10%2B-FF2D20?logo=laravel" alt="Laravel 10+"/>
-  <img src="https://img.shields.io/badge/Tests-513%20passing-brightgreen" alt="Tests"/>
+  <img src="https://img.shields.io/badge/PHP-8.2%2B-777BB4?logo=php" alt="PHP 8.2+"/>
+  <img src="https://img.shields.io/badge/Laravel-10%20|%2011%20|%2012-FF2D20?logo=laravel" alt="Laravel 10 | 11 | 12"/>
+  <img src="https://img.shields.io/badge/Tests-572%20passing-brightgreen" alt="Tests"/>
   <img src="https://img.shields.io/badge/License-Proprietary-blue" alt="License"/>
 </p>
 
@@ -48,7 +48,7 @@ Sisly is a Laravel package that provides AI-powered emotional coaching through f
 ### Requirements
 
 - PHP 8.2 or higher
-- Laravel 10.x, 11.x, or 12.x
+- Laravel 10.x, 11.x, or 12.x (any supported version)
 - OpenAI API key and/or Google Gemini API key
 
 ### Install via Composer
@@ -199,21 +199,20 @@ The Dispatcher automatically routes users to the most appropriate coach based on
 
 ```php
 // User describes anxiety → routed to MEETLY
-$response = Sisly::startSession('user-1', "I'm so anxious about the meeting");
-echo $response->coach; // "meetly"
+$response = Sisly::startSession("I'm so anxious about the meeting");
+echo $response->coachName; // "MEETLY"
 
 // User describes anger → routed to VENTO
-$response = Sisly::startSession('user-2', "I'm furious at my coworker");
-echo $response->coach; // "vento"
+$response = Sisly::startSession("I'm furious at my coworker");
+echo $response->coachName; // "VENTO"
 ```
 
 ### Manual Coach Selection
 
 ```php
 $response = Sisly::startSession(
-    sessionId: 'user-123',
     message: "I need help with something",
-    coachId: 'presso'  // Force specific coach
+    context: ['coach' => 'presso']  // Force specific coach
 );
 ```
 
@@ -257,15 +256,18 @@ Sisly includes a **deterministic** crisis detection system that runs BEFORE any 
 
 ```php
 // Crisis detection is automatic - no configuration needed
-$response = Sisly::startSession('user-123', "I want to end my life");
+$response = Sisly::startSession(
+    message: "I want to end my life",
+    context: ['country' => 'SA']
+);
 
 // Session immediately enters crisis state
 echo $response->state->value; // "crisis_intervention"
-echo $response->isCrisis; // true
+echo $response->crisis->detected; // true
 
-// Response includes emergency resources
-echo $response->crisisInfo->emergencyNumber; // "911" (based on user's country)
-echo $response->crisisInfo->hotline; // Local crisis hotline
+// Crisis info includes severity and category
+echo $response->crisis->severity->value; // "critical"
+echo $response->crisis->category->value; // "suicide"
 ```
 
 ### Supported Crisis Categories
@@ -418,7 +420,7 @@ Sisly::message(string $sessionId, string $message): SislyResponse;
 
 // Get current session state
 Sisly::getState(string $sessionId): array;
-// Returns: ['state' => 'exploration', 'turn_count' => 2, 'coach' => 'meetly', ...]
+// Returns: ['state' => 'exploration', 'turn_count' => 2, 'is_active' => true, 'coach_id' => 'meetly']
 
 // End a session
 Sisly::endSession(string $sessionId): void;
@@ -439,7 +441,7 @@ class SislyResponse
     public ?string $arabicMirror;          // Arabic translation
     public SessionState $state;            // Current FSM state
     public int $turnCount;                 // Current turn number
-    public CrisisInfo $crisis;             // Crisis info (check $crisis->detected)
+    public CrisisInfo $crisis;             // Crisis info (check $crisis->detected, ->severity, ->category)
     public ?CoETrace $coeTrace;            // Chain of Empathy reasoning trace
     public bool $sessionComplete;          // Is session finished?
     public ?string $handoffSuggested;      // Suggested coach handoff
@@ -532,12 +534,14 @@ $mock->addResponse('anxiety', 'I understand you feel anxious...');
 ```php
 use Sisly\Coaches\BaseCoach;
 use Sisly\Contracts\CoachInterface;
+use Sisly\Enums\CoachId;
+use Sisly\Enums\SessionState;
 
 class CustomCoach extends BaseCoach implements CoachInterface
 {
-    public function getId(): string
+    public function getId(): CoachId
     {
-        return 'custom';
+        return CoachId::MEETLY; // Replace with your own enum value
     }
 
     public function getName(): string
@@ -545,10 +549,15 @@ class CustomCoach extends BaseCoach implements CoachInterface
         return 'Custom Coach';
     }
 
-    public function getFocus(): string
+    public function getDescription(): string
     {
         return 'Custom emotional support';
     }
+
+    public function getSystemPrompt(SessionState $state): string { /* ... */ }
+    public function getStatePrompt(SessionState $state): string { /* ... */ }
+    public function getDomains(): array { return ['custom-domain']; }
+    public function getTriggers(): array { return ['custom-keyword']; }
 }
 
 // Register in service provider

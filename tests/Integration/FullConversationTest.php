@@ -91,6 +91,108 @@ class FullConversationTest extends IntegrationTestCase
         Sisly::endSession($response->sessionId);
     }
 
+    public function test_complete_overwhelm_coaching_session(): void
+    {
+        $this->requireAnyLLM();
+        $this->configureRealLLM();
+
+        // Start session with overwhelm message
+        $response = Sisly::startSession(
+            message: "I'm completely overwhelmed with my workload. There are so many deadlines and I can't cope.",
+            context: ['coach' => 'presso', 'country' => 'AE']
+        );
+
+        $this->assertNotEmpty($response->sessionId);
+        $this->assertEquals('presso', $response->coachId->value);
+        $this->assertNotEmpty($response->responseText);
+
+        // Response should acknowledge the overwhelm
+        $content = strtolower($response->responseText);
+        $this->assertTrue(
+            str_contains($content, 'overwhelm') ||
+            str_contains($content, 'hear') ||
+            str_contains($content, 'lot') ||
+            str_contains($content, 'much') ||
+            str_contains($content, 'pressure') ||
+            str_contains($content, 'breath'),
+            "Response should acknowledge overwhelm. Got: {$response->responseText}"
+        );
+
+        // Continue the conversation
+        $response2 = Sisly::message($response->sessionId, "I have three projects due this week and I can't even start.");
+        $this->assertNotEmpty($response2->responseText);
+
+        Sisly::endSession($response->sessionId);
+    }
+
+    public function test_complete_overthinking_coaching_session(): void
+    {
+        $this->requireAnyLLM();
+        $this->configureRealLLM();
+
+        // Start session with rumination message
+        $response = Sisly::startSession(
+            message: "I can't stop replaying a conversation I had with my manager yesterday. I keep thinking about what I should have said differently.",
+            context: ['coach' => 'loopy', 'country' => 'AE']
+        );
+
+        $this->assertNotEmpty($response->sessionId);
+        $this->assertEquals('loopy', $response->coachId->value);
+        $this->assertNotEmpty($response->responseText);
+
+        // Response should acknowledge the loop/replay
+        $content = strtolower($response->responseText);
+        $this->assertTrue(
+            str_contains($content, 'replay') ||
+            str_contains($content, 'think') ||
+            str_contains($content, 'mind') ||
+            str_contains($content, 'loop') ||
+            str_contains($content, 'stuck') ||
+            str_contains($content, 'going back'),
+            "Response should acknowledge the thought loop. Got: {$response->responseText}"
+        );
+
+        // Continue the conversation
+        $response2 = Sisly::message($response->sessionId, "It's been going on all night, I couldn't sleep.");
+        $this->assertNotEmpty($response2->responseText);
+
+        Sisly::endSession($response->sessionId);
+    }
+
+    public function test_complete_self_doubt_coaching_session(): void
+    {
+        $this->requireAnyLLM();
+        $this->configureRealLLM();
+
+        // Start session with imposter syndrome message
+        $response = Sisly::startSession(
+            message: "I just got promoted but I feel like a total fraud. Everyone else seems so much more qualified than me.",
+            context: ['coach' => 'boostly', 'country' => 'AE']
+        );
+
+        $this->assertNotEmpty($response->sessionId);
+        $this->assertEquals('boostly', $response->coachId->value);
+        $this->assertNotEmpty($response->responseText);
+
+        // Response should acknowledge the doubt without cheerleading
+        $content = strtolower($response->responseText);
+        $this->assertTrue(
+            str_contains($content, 'doubt') ||
+            str_contains($content, 'imposter') ||
+            str_contains($content, 'fraud') ||
+            str_contains($content, 'feel') ||
+            str_contains($content, 'promoted') ||
+            str_contains($content, 'question'),
+            "Response should acknowledge the self-doubt. Got: {$response->responseText}"
+        );
+
+        // Continue the conversation
+        $response2 = Sisly::message($response->sessionId, "I keep comparing myself to my colleagues who have more experience.");
+        $this->assertNotEmpty($response2->responseText);
+
+        Sisly::endSession($response->sessionId);
+    }
+
     public function test_automatic_coach_selection(): void
     {
         $this->requireAnyLLM();
@@ -119,6 +221,22 @@ class FullConversationTest extends IntegrationTestCase
         );
         $this->assertEquals('loopy', $response3->coachId->value);
         Sisly::endSession($response3->sessionId);
+
+        // Overwhelm message should route to PRESSO
+        $response4 = Sisly::startSession(
+            message: "I'm completely overwhelmed, there's too much to do and I can't cope.",
+            context: ['country' => 'AE']
+        );
+        $this->assertEquals('presso', $response4->coachId->value);
+        Sisly::endSession($response4->sessionId);
+
+        // Self-doubt message should route to BOOSTLY
+        $response5 = Sisly::startSession(
+            message: "I feel like a fraud, I'm not good enough for this job.",
+            context: ['country' => 'AE']
+        );
+        $this->assertEquals('boostly', $response5->coachId->value);
+        Sisly::endSession($response5->sessionId);
     }
 
     public function test_multi_turn_conversation_maintains_context(): void
