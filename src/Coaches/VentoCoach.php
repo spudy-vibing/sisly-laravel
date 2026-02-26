@@ -267,4 +267,26 @@ SAFETY MODE. The user may be in crisis.
 Keep it simple and human. No techniques.
 PROMPT;
     }
+
+    /**
+     * Get the coach's greeting in the specified language.
+     */
+    public function getGreeting(string $language = 'en'): string
+    {
+        $englishGreeting = $this->getEnglishGreeting();
+
+        if ($language === 'ar') {
+            return $this->generateArabicGreeting($englishGreeting);
+        }
+
+        return $englishGreeting;
+    }
+
+    /**
+     * Get the English greeting for VENTO.
+     */
+    protected function getEnglishGreeting(): string
+    {
+        return "I'm Vento. Sometimes you just need to let it out. What's got you heated right now?";
+    }
 }

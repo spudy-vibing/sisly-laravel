@@ -86,8 +86,8 @@ class SislyManager
         // Add the user message as a turn
         $session->addTurn(ConversationTurn::user($message));
 
-        // Track turn in FSM
-        $this->stateMachine->incrementStateTurns($session->id);
+        // Track turn in FSM (stateTurns persisted on Session object)
+        $this->stateMachine->incrementStateTurns($session);
 
         // SAFETY FIRST: Check for crisis before any LLM processing
         if ($this->isCrisisDetectionEnabled()) {
@@ -128,7 +128,7 @@ class SislyManager
             // For INTAKE, always advance to EXPLORATION after first turn
             if ($session->state === SessionState::INTAKE) {
                 $session->transitionTo(SessionState::EXPLORATION);
-                $this->stateMachine->resetStateTurns($session->id);
+                // Note: transitionTo() now resets stateTurns automatically
                 $this->dispatchStateTransitionEvent($session, $previousState);
             }
         }
@@ -142,6 +142,111 @@ class SislyManager
             arabicMirror: $arabicMirror,
             coeTrace: $coeTrace,
         );
+    }
+
+    /**
+     * Initialize a new session with a coach-initiated greeting.
+     *
+     * Unlike startSession(), this method does not require a user message.
+     * The coach sends the first message (greeting) to initiate the conversation.
+     *
+     * @param array{geo?: GeoContext|array<string, mixed>, preferences?: SessionPreferences|array<string, mixed>, coach_id?: string|CoachId} $context
+     */
+    public function initSession(array $context = []): SislyResponse
+    {
+        // Generate session ID
+        $sessionId = $this->generateSessionId();
+
+        // Parse context
+        $geo = $this->resolveGeoContext($context);
+        $preferences = $this->resolvePreferences($context);
+
+        // Resolve coach ID - must be explicitly provided or use default
+        $coachId = $this->resolveCoachIdForInit($context);
+
+        // Create session
+        $session = Session::create(
+            id: $sessionId,
+            coachId: $coachId,
+            geo: $geo,
+            preferences: $preferences,
+        );
+
+        // Dispatch session started event
+        $this->dispatchSessionStartedEvent($session);
+
+        // Get greeting from coach in user's preferred language
+        $greeting = $this->getCoachGreeting($session);
+
+        // Add assistant greeting as first turn (coach speaks first)
+        $session->addTurn(ConversationTurn::assistant($greeting));
+
+        // Save session
+        $this->sessionStore->save($session);
+
+        return SislyResponse::fromSession(
+            session: $session,
+            responseText: $greeting,
+            arabicMirror: null, // No mirror - greeting is already in preferred language
+        );
+    }
+
+    /**
+     * Get the coach greeting in the user's preferred language.
+     */
+    private function getCoachGreeting(Session $session): string
+    {
+        if ($this->coachRegistry === null) {
+            return $this->getDefaultGreeting($session);
+        }
+
+        try {
+            $coach = $this->coachRegistry->get($session->coachId);
+            return $coach->getGreeting($session->preferences->language);
+        } catch (\Throwable $e) {
+            // Log error for debugging
+            if (function_exists('app') && app()->bound('log')) {
+                app('log')->warning('Sisly: Failed to get coach greeting', [
+                    'coach' => $session->coachId->value,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+            return $this->getDefaultGreeting($session);
+        }
+    }
+
+    /**
+     * Get a default greeting when coach greeting is unavailable.
+     */
+    private function getDefaultGreeting(Session $session): string
+    {
+        $coachName = $session->coachId->displayName();
+
+        if ($session->preferences->language === 'ar') {
+            return "مرحباً، أنا {$coachName}. أنا هنا معك.";
+        }
+
+        return "Hi, I'm {$coachName}. I'm here with you.";
+    }
+
+    /**
+     * Resolve coach ID for initSession (no message to analyze).
+     */
+    private function resolveCoachIdForInit(array $context): CoachId
+    {
+        $coachId = $context['coach_id'] ?? null;
+
+        if ($coachId instanceof CoachId) {
+            return $coachId;
+        }
+
+        if (is_string($coachId)) {
+            return CoachId::from($coachId);
+        }
+
+        // Default coach from config
+        $default = $this->config['coaches']['default'] ?? 'meetly';
+        return CoachId::from($default);
     }
 
     /**
@@ -165,8 +270,8 @@ class SislyManager
         // Add user turn
         $session->addTurn(ConversationTurn::user($message));
 
-        // Track turn in FSM
-        $this->stateMachine->incrementStateTurns($session->id);
+        // Track turn in FSM (stateTurns persisted on Session object)
+        $this->stateMachine->incrementStateTurns($session);
 
         // SAFETY FIRST: Check for crisis before any LLM processing
         if ($this->isCrisisDetectionEnabled()) {

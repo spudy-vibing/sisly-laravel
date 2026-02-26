@@ -29,13 +29,6 @@ class StateMachine
     private array $transitions;
 
     /**
-     * Tracks turns spent in current state per session.
-     *
-     * @var array<string, int>
-     */
-    private array $stateTurns = [];
-
-    /**
      * @param array<string, mixed> $config FSM configuration
      */
     public function __construct(array $config = [])
@@ -117,11 +110,10 @@ class StateMachine
             return false;
         }
 
-        // Check turn limit for current state
-        $stateTurns = $this->getStateTurns($session->id);
+        // Check turn limit for current state (stateTurns is now on Session)
         $limit = $this->turnLimits[$session->state->value] ?? 1;
 
-        return $stateTurns >= $limit;
+        return $session->stateTurns >= $limit;
     }
 
     /**
@@ -159,19 +151,16 @@ class StateMachine
 
         // Handle RISK_TRIAGE as an automatic pass-through
         if ($nextState === SessionState::RISK_TRIAGE) {
-            $session->transitionTo($nextState);
-            $this->resetStateTurns($session->id);
+            $session->transitionTo($nextState); // This resets stateTurns
             // Immediately advance past RISK_TRIAGE to EXPLORATION
             $nextState = $this->getNextState($nextState);
             if ($nextState !== null) {
-                $session->transitionTo($nextState);
-                $this->resetStateTurns($session->id);
+                $session->transitionTo($nextState); // This resets stateTurns
             }
             return true;
         }
 
-        $session->transitionTo($nextState);
-        $this->resetStateTurns($session->id);
+        $session->transitionTo($nextState); // This resets stateTurns
         return true;
     }
 
@@ -193,37 +182,28 @@ class StateMachine
 
     /**
      * Increment the turn counter for the current state.
+     * Note: stateTurns is now stored on the Session object and persisted.
      */
-    public function incrementStateTurns(string $sessionId): void
+    public function incrementStateTurns(Session $session): void
     {
-        if (!isset($this->stateTurns[$sessionId])) {
-            $this->stateTurns[$sessionId] = 0;
-        }
-        $this->stateTurns[$sessionId]++;
+        $session->stateTurns++;
     }
 
     /**
      * Get the number of turns spent in the current state.
      */
-    public function getStateTurns(string $sessionId): int
+    public function getStateTurns(Session $session): int
     {
-        return $this->stateTurns[$sessionId] ?? 0;
+        return $session->stateTurns;
     }
 
     /**
      * Reset turn counter for a session (called on state transition).
+     * Note: Session::transitionTo() now handles this automatically.
      */
-    public function resetStateTurns(string $sessionId): void
+    public function resetStateTurns(Session $session): void
     {
-        $this->stateTurns[$sessionId] = 0;
-    }
-
-    /**
-     * Set turn count for a session (for restoration from storage).
-     */
-    public function setStateTurns(string $sessionId, int $turns): void
-    {
-        $this->stateTurns[$sessionId] = $turns;
+        $session->stateTurns = 0;
     }
 
     /**
@@ -242,13 +222,5 @@ class StateMachine
     public function getAllTurnLimits(): array
     {
         return $this->turnLimits;
-    }
-
-    /**
-     * Clean up state turns for a session (call when session ends).
-     */
-    public function cleanup(string $sessionId): void
-    {
-        unset($this->stateTurns[$sessionId]);
     }
 }

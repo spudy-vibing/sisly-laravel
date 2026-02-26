@@ -15,6 +15,7 @@ use Sisly\SislyManager;
 
 /**
  * @method static SislyResponse startSession(string $message, array $context = [])
+ * @method static SislyResponse initSession(array $context = [])
  * @method static SislyResponse message(string $sessionId, string $message)
  * @method static Session|null getSession(string $sessionId)
  * @method static array getState(string $sessionId)

@@ -108,7 +108,7 @@ class StateMachineTest extends TestCase
 
         // Even with many turns, should never advance
         for ($i = 0; $i < 100; $i++) {
-            $this->fsm->incrementStateTurns($session->id);
+            $this->fsm->incrementStateTurns($session);
         }
 
         $this->assertFalse($this->fsm->shouldAdvance($session));
@@ -138,8 +138,8 @@ class StateMachineTest extends TestCase
         $session = $this->createSession();
         $session->transitionTo(SessionState::CLOSING);
 
-        $this->fsm->incrementStateTurns($session->id);
-        $this->fsm->incrementStateTurns($session->id);
+        $this->fsm->incrementStateTurns($session);
+        $this->fsm->incrementStateTurns($session);
 
         $this->assertFalse($this->fsm->shouldAdvance($session));
     }
@@ -171,13 +171,13 @@ class StateMachineTest extends TestCase
         $session = $this->createSession();
         $session->transitionTo(SessionState::EXPLORATION);
 
-        $this->fsm->resetStateTurns($session->id);
+        $this->fsm->resetStateTurns($session);
         $this->assertFalse($this->fsm->shouldAdvance($session));
 
-        $this->fsm->incrementStateTurns($session->id);
+        $this->fsm->incrementStateTurns($session);
         $this->assertFalse($this->fsm->shouldAdvance($session));
 
-        $this->fsm->incrementStateTurns($session->id);
+        $this->fsm->incrementStateTurns($session);
         $this->assertTrue($this->fsm->shouldAdvance($session));
     }
 
@@ -186,9 +186,9 @@ class StateMachineTest extends TestCase
         $session = $this->createSession();
         $session->transitionTo(SessionState::PROBLEM_SOLVING);
 
-        $this->fsm->resetStateTurns($session->id);
-        $this->fsm->incrementStateTurns($session->id);
-        $this->fsm->incrementStateTurns($session->id);
+        $this->fsm->resetStateTurns($session);
+        $this->fsm->incrementStateTurns($session);
+        $this->fsm->incrementStateTurns($session);
 
         // At 2 turns, limit is 3
         $this->assertFalse($this->fsm->shouldAdvance($session));
@@ -201,9 +201,9 @@ class StateMachineTest extends TestCase
         $session = $this->createSession();
         $session->transitionTo(SessionState::EXPLORATION);
 
-        $this->fsm->resetStateTurns($session->id);
-        $this->fsm->incrementStateTurns($session->id);
-        $this->fsm->incrementStateTurns($session->id);
+        $this->fsm->resetStateTurns($session);
+        $this->fsm->incrementStateTurns($session);
+        $this->fsm->incrementStateTurns($session);
 
         $advanced = $this->fsm->advance($session);
 
@@ -216,12 +216,12 @@ class StateMachineTest extends TestCase
         $session = $this->createSession();
         $session->transitionTo(SessionState::EXPLORATION);
 
-        $this->fsm->resetStateTurns($session->id);
-        $this->fsm->incrementStateTurns($session->id);
-        $this->fsm->incrementStateTurns($session->id);
+        $this->fsm->resetStateTurns($session);
+        $this->fsm->incrementStateTurns($session);
+        $this->fsm->incrementStateTurns($session);
         $this->fsm->advance($session);
 
-        $this->assertEquals(0, $this->fsm->getStateTurns($session->id));
+        $this->assertEquals(0, $this->fsm->getStateTurns($session));
     }
 
     public function test_advance_returns_false_when_not_ready(): void
@@ -229,8 +229,8 @@ class StateMachineTest extends TestCase
         $session = $this->createSession();
         $session->transitionTo(SessionState::EXPLORATION);
 
-        $this->fsm->resetStateTurns($session->id);
-        $this->fsm->incrementStateTurns($session->id);
+        $this->fsm->resetStateTurns($session);
+        $this->fsm->incrementStateTurns($session);
 
         $this->assertFalse($this->fsm->advance($session));
         $this->assertEquals(SessionState::EXPLORATION, $session->state);
@@ -275,45 +275,51 @@ class StateMachineTest extends TestCase
 
     public function test_increment_and_get_state_turns(): void
     {
-        $sessionId = 'test-session-1';
+        $session = $this->createSession();
 
-        $this->assertEquals(0, $this->fsm->getStateTurns($sessionId));
+        $this->assertEquals(0, $this->fsm->getStateTurns($session));
 
-        $this->fsm->incrementStateTurns($sessionId);
-        $this->assertEquals(1, $this->fsm->getStateTurns($sessionId));
+        $this->fsm->incrementStateTurns($session);
+        $this->assertEquals(1, $this->fsm->getStateTurns($session));
 
-        $this->fsm->incrementStateTurns($sessionId);
-        $this->assertEquals(2, $this->fsm->getStateTurns($sessionId));
+        $this->fsm->incrementStateTurns($session);
+        $this->assertEquals(2, $this->fsm->getStateTurns($session));
     }
 
     public function test_reset_state_turns(): void
     {
-        $sessionId = 'test-session-2';
+        $session = $this->createSession();
 
-        $this->fsm->incrementStateTurns($sessionId);
-        $this->fsm->incrementStateTurns($sessionId);
-        $this->fsm->resetStateTurns($sessionId);
+        $this->fsm->incrementStateTurns($session);
+        $this->fsm->incrementStateTurns($session);
+        $this->fsm->resetStateTurns($session);
 
-        $this->assertEquals(0, $this->fsm->getStateTurns($sessionId));
+        $this->assertEquals(0, $this->fsm->getStateTurns($session));
     }
 
-    public function test_set_state_turns(): void
+    public function test_state_turns_persisted_on_session(): void
     {
-        $sessionId = 'test-session-3';
+        $session = $this->createSession();
 
-        $this->fsm->setStateTurns($sessionId, 5);
-        $this->assertEquals(5, $this->fsm->getStateTurns($sessionId));
+        $this->fsm->incrementStateTurns($session);
+        $this->fsm->incrementStateTurns($session);
+
+        // Verify stateTurns is stored on the session object
+        $this->assertEquals(2, $session->stateTurns);
     }
 
-    public function test_cleanup_removes_session_data(): void
+    public function test_transition_resets_state_turns(): void
     {
-        $sessionId = 'test-session-4';
+        $session = $this->createSession();
 
-        $this->fsm->incrementStateTurns($sessionId);
-        $this->fsm->incrementStateTurns($sessionId);
-        $this->fsm->cleanup($sessionId);
+        $this->fsm->incrementStateTurns($session);
+        $this->fsm->incrementStateTurns($session);
+        $this->assertEquals(2, $session->stateTurns);
 
-        $this->assertEquals(0, $this->fsm->getStateTurns($sessionId));
+        // Transitioning to a new state resets stateTurns
+        $session->transitionTo(SessionState::EXPLORATION);
+
+        $this->assertEquals(0, $session->stateTurns);
     }
 
     // ==================== CUSTOM CONFIG ====================
@@ -347,28 +353,28 @@ class StateMachineTest extends TestCase
         $session = $this->createSession();
 
         // INTAKE -> RISK_TRIAGE (auto) -> EXPLORATION
-        $this->fsm->incrementStateTurns($session->id);
+        $this->fsm->incrementStateTurns($session);
         $this->fsm->advance($session);
         // Note: advance handles RISK_TRIAGE as pass-through
         $this->assertEquals(SessionState::EXPLORATION, $session->state);
 
         // EXPLORATION (2 turns) -> DEEPENING
-        $this->fsm->incrementStateTurns($session->id);
+        $this->fsm->incrementStateTurns($session);
         $this->assertFalse($this->fsm->shouldAdvance($session));
-        $this->fsm->incrementStateTurns($session->id);
+        $this->fsm->incrementStateTurns($session);
         $this->assertTrue($this->fsm->shouldAdvance($session));
         $this->fsm->advance($session);
         $this->assertEquals(SessionState::DEEPENING, $session->state);
 
         // DEEPENING (1 turn) -> PROBLEM_SOLVING
-        $this->fsm->incrementStateTurns($session->id);
+        $this->fsm->incrementStateTurns($session);
         $this->fsm->advance($session);
         $this->assertEquals(SessionState::PROBLEM_SOLVING, $session->state);
 
         // PROBLEM_SOLVING (3 turns) -> CLOSING
-        $this->fsm->incrementStateTurns($session->id);
-        $this->fsm->incrementStateTurns($session->id);
-        $this->fsm->incrementStateTurns($session->id);
+        $this->fsm->incrementStateTurns($session);
+        $this->fsm->incrementStateTurns($session);
+        $this->fsm->incrementStateTurns($session);
         $this->fsm->advance($session);
         $this->assertEquals(SessionState::CLOSING, $session->state);
 

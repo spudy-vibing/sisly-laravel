@@ -232,11 +232,11 @@ foreach ($scenarios as $scenarioIndex => $scenario) {
             // Add coach response to history
             $session->addTurn(ConversationTurn::assistant($response));
 
-            // Try to advance state using FSM
-            $stateMachine->incrementStateTurns($session->id);
+            // Try to advance state using FSM (stateTurns now persisted on Session)
+            $stateMachine->incrementStateTurns($session);
             if ($stateMachine->shouldAdvance($session)) {
                 $stateMachine->advance($session);
-                $stateMachine->resetStateTurns($session->id);
+                // Note: advance() calls transitionTo() which resets stateTurns automatically
             }
 
             // Format for markdown

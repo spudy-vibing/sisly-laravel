@@ -23,6 +23,7 @@ final class Session
         public CoachId $coachId,
         public SessionState $state,
         public int $turnCount,
+        public int $stateTurns,
         public readonly GeoContext $geo,
         public readonly SessionPreferences $preferences,
         public array $history,
@@ -48,6 +49,7 @@ final class Session
             coachId: $coachId,
             state: SessionState::INTAKE,
             turnCount: 0,
+            stateTurns: 0,
             geo: $geo,
             preferences: $preferences ?? new SessionPreferences(),
             history: [],
@@ -79,6 +81,7 @@ final class Session
     public function transitionTo(SessionState $newState): void
     {
         $this->state = $newState;
+        $this->stateTurns = 0; // Reset turn counter for new state
         $this->lastActivity = new DateTimeImmutable();
     }
 
@@ -143,6 +146,7 @@ final class Session
             coachId: CoachId::from($data['coach_id']),
             state: SessionState::from($data['state']),
             turnCount: $data['turn_count'],
+            stateTurns: $data['state_turns'] ?? 0,
             geo: GeoContext::fromArray($data['geo']),
             preferences: SessionPreferences::fromArray($data['preferences']),
             history: array_map(
@@ -168,6 +172,7 @@ final class Session
             'coach_id' => $this->coachId->value,
             'state' => $this->state->value,
             'turn_count' => $this->turnCount,
+            'state_turns' => $this->stateTurns,
             'geo' => $this->geo->toArray(),
             'preferences' => $this->preferences->toArray(),
             'history' => array_map(
