@@ -7,17 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-02-26
+
 ### Added
+- **Coach-Initiated Sessions**: New `initSession()` method allows coaches to send the first message
+  - Each coach has a unique, domain-specific greeting
+  - Greetings available in English and Arabic
+  - Usage: `Sisly::initSession(['coach_id' => 'meetly', 'preferences' => ['language' => 'en']])`
 - **PRESSO Coach**: Pressure and overwhelm coach — nervous system regulation, slow pacing, felt vs real urgency (21 tests)
 - **VENTO Coach**: Anger and frustration release coach — safe emotional discharge, validation without fixing (21 tests)
 - **LOOPY Coach**: Rumination and overthinking coach — pattern interruption, present-moment grounding (21 tests)
 - **BOOSTLY Coach**: Self-doubt and imposter syndrome coach — evidence-based competence reconnection (21 tests)
 - All 5 coaches now fully implemented with dedicated classes, prompt files, and test suites
-- CoachRegistry no longer uses MeetlyCoach fallbacks for any coach
+- `getGreeting()` method added to `CoachInterface` contract
 
 ### Changed
-- Test count increased from 488 to 572 (1290 assertions)
+- **Single-Language Responses**: Responses now generated in ONE language based on `preferences.language`
+  - Set `'language' => 'en'` for English-only responses
+  - Set `'language' => 'ar'` for Arabic-only responses (Gulf dialect)
+  - `arabicMirror` field remains in response but is now `null` (backward compatible)
+- Language instruction added to LLM system prompts for consistent output
+- Test count increased from 488 to 572 (1291 assertions)
 - CoachRegistry cleaned up — removed TODO comment and all temporary fallback lines
+
+### Fixed
+- **FSM State Persistence Bug**: State turn counter was stored in-memory only, causing states to never advance beyond EXPLORATION across HTTP requests
+  - `stateTurns` now stored on `Session` object and persisted to session store
+  - States now properly transition: INTAKE → EXPLORATION → DEEPENING → PROBLEM_SOLVING → CLOSING
 
 ## [1.0.0] - 2026-02-02
 
@@ -85,6 +101,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| 1.1.0 | 2026-02-26 | All 5 coaches, initSession(), single-language responses, FSM bug fix |
 | 1.0.0 | 2026-02-02 | Initial release with MEETLY coach, safety layer, and full GCC support |
 
 ---
@@ -117,13 +134,18 @@ If you were using a beta version:
 
 ## Roadmap
 
-### 1.1.0 (Planned)
+### 1.1.0 ✅ Released
 - [x] Additional coaches: PRESSO, VENTO, LOOPY, BOOSTLY full implementations
+- [x] Coach-initiated sessions (`initSession()`)
+- [x] Single-language responses (EN or AR based on preference)
+- [x] FSM state persistence fix
+
+### 1.2.0 (Planned)
 - [ ] Coach handoff between sessions
 - [ ] Analytics dashboard integration
 - [ ] Webhook support for external integrations
 
-### 1.2.0 (Planned)
+### 1.3.0 (Planned)
 - [ ] Voice input support
 - [ ] Multi-language expansion (Urdu, Hindi, Tagalog for GCC expat population)
 - [ ] Custom coach builder UI
@@ -131,5 +153,6 @@ If you were using a beta version:
 
 ---
 
-[Unreleased]: https://github.com/sisly/sisly-laravel/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/sisly/sisly-laravel/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/sisly/sisly-laravel/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/sisly/sisly-laravel/releases/tag/v1.0.0
