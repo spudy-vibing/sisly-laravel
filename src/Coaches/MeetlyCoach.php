@@ -261,25 +261,21 @@ Keep it simple and human. No techniques.
 PROMPT;
     }
 
-    /**
-     * Get the coach's greeting in the specified language.
-     */
-    public function getGreeting(string $language = 'en'): string
+    private const GREETINGS = [
+        ['en' => 'Got a meeting coming up? Tell me what part is stressing you.',
+         'ar' => 'لديك اجتماع قريب؟ أخبرني ما الذي يسبب لك التوتر.'],
+        ['en' => "Camera on and feeling nervous? I've got you. What meeting are you preparing for?",
+         'ar' => 'الكاميرا ستُفتح وتشعر بالتوتر؟ أنا معك. لأي اجتماع تستعد؟'],
+        ['en' => "Let's make that meeting easier. What are you worried about saying?",
+         'ar' => 'دعنا نجعل هذا الاجتماع أسهل. ما الذي تقلق بشأن قوله؟'],
+        ['en' => "Before the call starts, let's prepare together. What kind of meeting is it?",
+         'ar' => 'قبل أن يبدأ الاجتماع، دعنا نستعد معاً. ما نوع هذا الاجتماع؟'],
+        ['en' => "Presenting, speaking up, or being on camera? What's the situation today?",
+         'ar' => 'عرض تقديمي، أو التحدث في الاجتماع، أو تشغيل الكاميرا؟ ما الوضع اليوم؟'],
+    ];
+
+    public function getGreetings(): array
     {
-        $englishGreeting = $this->getEnglishGreeting();
-
-        if ($language === 'ar') {
-            return $this->generateArabicGreeting($englishGreeting);
-        }
-
-        return $englishGreeting;
-    }
-
-    /**
-     * Get the English greeting for MEETLY.
-     */
-    protected function getEnglishGreeting(): string
-    {
-        return "Hi, I'm Meetly. I help with meeting and presentation nerves. Which moment ahead is on your mind?";
+        return self::GREETINGS;
     }
 }

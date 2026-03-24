@@ -270,25 +270,21 @@ Keep it simple and human. No techniques.
 PROMPT;
     }
 
-    /**
-     * Get the coach's greeting in the specified language.
-     */
-    public function getGreeting(string $language = 'en'): string
+    private const GREETINGS = [
+        ['en' => 'Mind replaying something again and again? What thought is stuck?',
+         'ar' => 'هل يعيد عقلك نفس الفكرة مراراً؟ ما الفكرة التي لا تغادر ذهنك؟'],
+        ['en' => 'Overthinking can feel exhausting. What keeps coming back to your mind?',
+         'ar' => 'التفكير الزائد قد يكون مرهقاً. ما الشيء الذي يعود إلى ذهنك باستمرار؟'],
+        ['en' => "Let's break that mental loop together. What are you replaying right now?",
+         'ar' => 'دعنا نكسر دائرة التفكير هذه معاً. ما الذي تعيد التفكير فيه الآن؟'],
+        ['en' => 'Sometimes our mind runs the same story repeatedly. What thought is stuck?',
+         'ar' => 'أحياناً يعيد العقل نفس القصة مراراً. ما الفكرة العالقة في ذهنك؟'],
+        ['en' => 'Tell me the thought that keeps circling in your mind.',
+         'ar' => 'أخبرني ما الفكرة التي تدور في ذهنك باستمرار.'],
+    ];
+
+    public function getGreetings(): array
     {
-        $englishGreeting = $this->getEnglishGreeting();
-
-        if ($language === 'ar') {
-            return $this->generateArabicGreeting($englishGreeting);
-        }
-
-        return $englishGreeting;
-    }
-
-    /**
-     * Get the English greeting for LOOPY.
-     */
-    protected function getEnglishGreeting(): string
-    {
-        return "Hey, I'm Loopy. I help when thoughts won't stop spinning. What's playing on repeat in your head?";
+        return self::GREETINGS;
     }
 }

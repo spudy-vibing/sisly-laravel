@@ -271,25 +271,21 @@ Keep it simple and human. No techniques.
 PROMPT;
     }
 
-    /**
-     * Get the coach's greeting in the specified language.
-     */
-    public function getGreeting(string $language = 'en'): string
+    private const GREETINGS = [
+        ['en' => "Confidence feeling a little low today? What's making you doubt yourself?",
+         'ar' => 'هل تشعر أن ثقتك بنفسك منخفضة اليوم؟ ما الذي يجعلك تشك في نفسك؟'],
+        ['en' => 'Everyone needs a boost sometimes. What situation do you need confidence for?',
+         'ar' => 'الجميع يحتاج دفعة ثقة أحياناً. في أي موقف تحتاج إلى مزيد من الثقة؟'],
+        ['en' => "Let's rebuild your confidence step by step. What's coming up for you?",
+         'ar' => 'دعنا نعيد بناء ثقتك خطوة بخطوة. ما الذي ينتظرك قريباً؟'],
+        ['en' => "You're capable. Sometimes we just forget it. What's making you unsure today?",
+         'ar' => 'أنت قادر. أحياناً فقط ننسى ذلك. ما الذي يجعلك غير واثق اليوم؟'],
+        ['en' => "Big moment ahead or small doubt creeping in? Tell me what's going on.",
+         'ar' => 'هل لديك موقف مهم أو شك بسيط يتسلل إليك؟ أخبرني ماذا يحدث.'],
+    ];
+
+    public function getGreetings(): array
     {
-        $englishGreeting = $this->getEnglishGreeting();
-
-        if ($language === 'ar') {
-            return $this->generateArabicGreeting($englishGreeting);
-        }
-
-        return $englishGreeting;
-    }
-
-    /**
-     * Get the English greeting for BOOSTLY.
-     */
-    protected function getEnglishGreeting(): string
-    {
-        return "Hi, I'm Boostly. The inner critic can be loud sometimes. What's making you question yourself today?";
+        return self::GREETINGS;
     }
 }

@@ -268,25 +268,21 @@ Keep it simple and human. No techniques.
 PROMPT;
     }
 
-    /**
-     * Get the coach's greeting in the specified language.
-     */
-    public function getGreeting(string $language = 'en'): string
+    private const GREETINGS = [
+        ['en' => "You can vent here. No filters needed. What's frustrating you?",
+         'ar' => 'يمكنك أن تفضفض هنا. لا حاجة لأي تصفية. ما الذي يزعجك؟'],
+        ['en' => 'Sometimes you just need to let it out. What happened today?',
+         'ar' => 'أحياناً نحتاج فقط أن نتحدث. ماذا حدث اليوم؟'],
+        ['en' => "I'm listening. What's been building up inside?",
+         'ar' => 'أنا أستمع لك. ما الذي تراكم بداخلك؟'],
+        ['en' => "Go ahead and say everything you need to say. What's bothering you?",
+         'ar' => 'تفضل وقل كل ما تريد. ما الذي يزعجك؟'],
+        ['en' => "Rough day? Let it out here. What's going on?",
+         'ar' => 'يوم صعب؟ تحدث عنه هنا. ماذا يحدث؟'],
+    ];
+
+    public function getGreetings(): array
     {
-        $englishGreeting = $this->getEnglishGreeting();
-
-        if ($language === 'ar') {
-            return $this->generateArabicGreeting($englishGreeting);
-        }
-
-        return $englishGreeting;
-    }
-
-    /**
-     * Get the English greeting for VENTO.
-     */
-    protected function getEnglishGreeting(): string
-    {
-        return "I'm Vento. Sometimes you just need to let it out. What's got you heated right now?";
+        return self::GREETINGS;
     }
 }

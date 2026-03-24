@@ -270,25 +270,21 @@ Keep it simple and human. No techniques.
 PROMPT;
     }
 
-    /**
-     * Get the coach's greeting in the specified language.
-     */
-    public function getGreeting(string $language = 'en'): string
+    private const GREETINGS = [
+        ['en' => "Looks like work might be intense right now. What's creating the most pressure today?",
+         'ar' => 'يبدو أن العمل مكثف اليوم. ما الشيء الذي يسبب أكبر ضغط لديك؟'],
+        ['en' => "Deadlines piling up? Let's sort it out. What feels most urgent?",
+         'ar' => 'المواعيد النهائية تتراكم؟ دعنا نرتب الأمور. ما الأكثر إلحاحاً الآن؟'],
+        ['en' => "Work pressure can build quickly. What's overwhelming your schedule?",
+         'ar' => 'ضغط العمل قد يتزايد بسرعة. ما الذي يربك جدولك اليوم؟'],
+        ['en' => "Let's organize things together. What's stressing you most at work?",
+         'ar' => 'دعنا ننظم الأمور معاً. ما أكثر شيء يسبب لك التوتر في العمل؟'],
+        ['en' => "Too many tasks and not enough time? Tell me what's on your plate.",
+         'ar' => 'مهام كثيرة ووقت قليل؟ أخبرني ما الذي لديك الآن.'],
+    ];
+
+    public function getGreetings(): array
     {
-        $englishGreeting = $this->getEnglishGreeting();
-
-        if ($language === 'ar') {
-            return $this->generateArabicGreeting($englishGreeting);
-        }
-
-        return $englishGreeting;
-    }
-
-    /**
-     * Get the English greeting for PRESSO.
-     */
-    protected function getEnglishGreeting(): string
-    {
-        return "I'm Presso. When everything feels like too much, I'm here. What's weighing on you right now?";
+        return self::GREETINGS;
     }
 }

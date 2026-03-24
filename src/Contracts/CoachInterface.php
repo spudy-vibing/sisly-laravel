@@ -68,7 +68,7 @@ interface CoachInterface
     public function getTriggers(): array;
 
     /**
-     * Get the coach's greeting message for initiating a session.
+     * Get a randomly selected greeting message for initiating a session.
      *
      * Returns a domain-specific greeting in the specified language.
      * Used when the coach initiates the conversation (coach speaks first).
@@ -77,4 +77,13 @@ interface CoachInterface
      * @return string The greeting message in the specified language
      */
     public function getGreeting(string $language = 'en'): string;
+
+    /**
+     * Get all available greeting pairs for this coach.
+     *
+     * Each pair contains 'en' and 'ar' keys with pre-written greetings.
+     *
+     * @return array<array{en: string, ar: string}>
+     */
+    public function getGreetings(): array;
 }

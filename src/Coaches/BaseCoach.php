@@ -142,30 +142,6 @@ PROMPT;
     }
 
     /**
-     * Generate Arabic mirror for the response.
-     */
-    protected function generateArabicMirror(string $response, Session $session): ?string
-    {
-        $prompt = <<<PROMPT
-Translate the emotional essence of this coaching response into one short Gulf Arabic line.
-Use Gulf dialect (خليجي), be warm and conversational.
-Maximum 15 words in Arabic.
-
-Response: {$response}
-
-Arabic mirror (one line only):
-PROMPT;
-
-        $result = $this->llm->generate($prompt, ['max_tokens' => 50]);
-
-        if (!$result->success) {
-            return null;
-        }
-
-        return trim($result->content);
-    }
-
-    /**
      * Get temperature setting for a state.
      */
     protected function getTemperatureForState(SessionState $state): float
@@ -239,48 +215,27 @@ PROMPT;
     }
 
     /**
-     * Get the coach's greeting message.
+     * Get a randomly selected greeting in the specified language.
      *
-     * Each coach must provide a domain-specific greeting.
-     * Override this method to provide custom greetings.
+     * Picks from the pre-written greeting pairs returned by getGreetings().
      *
      * @param string $language The preferred language ('en' or 'ar')
      * @return string The greeting message
      */
-    abstract public function getGreeting(string $language = 'en'): string;
-
-    /**
-     * Get the English greeting for this coach.
-     *
-     * Subclasses should override this to provide their domain-specific greeting.
-     */
-    abstract protected function getEnglishGreeting(): string;
-
-    /**
-     * Generate the Arabic version of a greeting using LLM.
-     */
-    protected function generateArabicGreeting(string $englishGreeting): string
+    public function getGreeting(string $language = 'en'): string
     {
-        $prompt = <<<PROMPT
-Translate this coaching greeting to warm Gulf Arabic (Khaleeji dialect - اللهجة الخليجية).
-Keep it natural and conversational, appropriate for UAE, Saudi Arabia, Kuwait, Bahrain, Qatar, and Oman.
-Maximum 25 words in Arabic.
+        $greetings = $this->getGreetings();
+        $selected = $greetings[array_rand($greetings)];
 
-English greeting: {$englishGreeting}
-
-Arabic greeting (no English, just Arabic):
-PROMPT;
-
-        $result = $this->llm->generate($prompt, [
-            'max_tokens' => 100,
-            'temperature' => 0.3, // Low temperature for consistency
-        ]);
-
-        if (!$result->success) {
-            // Fallback to a generic Arabic greeting
-            return "مرحباً، أنا {$this->getName()}. أنا هنا معك.";
-        }
-
-        return trim($result->content);
+        return $selected[$language] ?? $selected['en'];
     }
+
+    /**
+     * Get all available greeting pairs for this coach.
+     *
+     * Each subclass must return an array of bilingual greeting pairs.
+     *
+     * @return array<array{en: string, ar: string}>
+     */
+    abstract public function getGreetings(): array;
 }
