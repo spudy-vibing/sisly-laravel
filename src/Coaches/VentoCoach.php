@@ -92,6 +92,14 @@ class VentoCoach extends BaseCoach
         return 'Anger and frustration release coach - holds space for safe emotional discharge and validation.';
     }
 
+    public function getRoleDescription(string $language): string
+    {
+        return match ($language) {
+            'ar' => 'مدربتك لتفريغ الغضب والإحباط',
+            default => 'the coach for anger and frustration release',
+        };
+    }
+
     /**
      * Get the system prompt for a specific state.
      */

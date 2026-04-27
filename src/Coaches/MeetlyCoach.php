@@ -90,6 +90,14 @@ class MeetlyCoach extends BaseCoach
         return 'Meeting and performance anxiety coach - calms nerves and builds grounded readiness.';
     }
 
+    public function getRoleDescription(string $language): string
+    {
+        return match ($language) {
+            'ar' => 'مدربتك لقلق الاجتماعات والعروض',
+            default => 'the coach for meeting and presentation anxiety',
+        };
+    }
+
     /**
      * Get the system prompt for a specific state.
      */

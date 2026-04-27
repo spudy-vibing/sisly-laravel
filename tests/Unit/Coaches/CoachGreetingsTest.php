@@ -47,6 +47,7 @@ class CoachGreetingsTest extends TestCase
             public function getDomains(): array { return []; }
             public function getTriggers(): array { return []; }
             public function getGreetings(): array { return $this->stubbedGreetings; }
+            public function getRoleDescription(string $language): string { return 'stub role'; }
         };
     }
 

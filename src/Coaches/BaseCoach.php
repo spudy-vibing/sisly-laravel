@@ -21,15 +21,24 @@ abstract class BaseCoach implements CoachInterface
 {
     protected PromptLoader $promptLoader;
     protected CoEEngine $coeEngine;
+    protected IdentityQuestionDetector $identityDetector;
 
     public function __construct(
         protected readonly LLMProviderInterface $llm,
         ?PromptLoader $promptLoader = null,
         ?CoEEngine $coeEngine = null,
+        ?IdentityQuestionDetector $identityDetector = null,
     ) {
         $this->promptLoader = $promptLoader ?? new PromptLoader();
         $this->coeEngine = $coeEngine ?? new CoEEngine($llm);
+        $this->identityDetector = $identityDetector ?? new IdentityQuestionDetector();
     }
+
+    /**
+     * Short, per-language role description used in the hardcoded
+     * identity reply. Subclasses must localize for at least 'en' and 'ar'.
+     */
+    abstract public function getRoleDescription(string $language): string;
 
     /**
      * Process a user message and generate a response.
@@ -38,6 +47,18 @@ abstract class BaseCoach implements CoachInterface
      */
     public function process(Session $session, string $message): array
     {
+        // Identity questions ("what's your name?", "ما اسمك؟", etc.) bypass the
+        // LLM entirely and return a deterministic reply. Eliminates flakiness
+        // where the model would ignore the meta-question rule and run the
+        // standard intake script instead.
+        if ($this->identityDetector->isIdentityQuestion($message)) {
+            return [
+                'response' => $this->buildHardcodedIdentityReply($session),
+                'arabic_mirror' => null,
+                'coe_trace' => null,
+            ];
+        }
+
         // Build the full prompt with language instruction
         $systemPrompt = $this->buildFullSystemPrompt($session);
         $statePrompt = $this->getStatePrompt($session->state);
@@ -59,13 +80,33 @@ abstract class BaseCoach implements CoachInterface
     }
 
     /**
-     * Build the full system prompt including global rules, coach-specific content, and language.
+     * Build the deterministic identity reply.
+     *
+     * Coach name stays in Latin script in both languages — coach names are
+     * brand identifiers and should be consistent across languages.
+     */
+    protected function buildHardcodedIdentityReply(Session $session): string
+    {
+        $name = $this->getName();
+        $role = $this->getRoleDescription($session->preferences->language);
+
+        if ($session->preferences->language === 'ar') {
+            return "أنا {$name}، {$role}. شو في بالك اليوم؟";
+        }
+
+        return "I'm {$name}, {$role}. What's on your mind today?";
+    }
+
+    /**
+     * Build the system prompt: global rules + coach-specific content.
+     *
+     * Language enforcement is handled by buildLanguageRule() via getIdentityAnchor()
+     * which is appended last in generateResponse(). Single source of truth.
      */
     protected function buildFullSystemPrompt(Session $session): string
     {
         $globalRules = $this->promptLoader->loadGlobal('rules');
         $coachSystem = $this->getSystemPrompt($session->state);
-        $languageInstruction = $this->getLanguageInstruction($session->preferences->language);
 
         return <<<PROMPT
 {$globalRules}
@@ -73,36 +114,78 @@ abstract class BaseCoach implements CoachInterface
 ---
 
 {$coachSystem}
-
----
-
-{$languageInstruction}
 PROMPT;
     }
 
     /**
-     * Get language-specific instruction for the LLM.
+     * Final identity + language anchor appended last in the system prompt.
      *
-     * Ensures responses are generated in the user's preferred language only.
+     * Lands after all state-specific scripts so it wins recency bias over
+     * any conflicting "include Arabic mirror" content baked into the
+     * coach prompts. Also enforces the SessionPreferences.language and
+     * arabicMirror flags, which the prompt body otherwise ignores.
      */
-    protected function getLanguageInstruction(string $language): string
+    protected function getIdentityAnchor(Session $session): string
     {
+        $name = $this->getName();
+        $languageRule = $this->buildLanguageRule($session);
+
+        return <<<PROMPT
+=== FINAL OVERRIDE (highest priority — read this last) ===
+
+Your name is {$name}. Sisly is the platform, not your name.
+
+If the user's latest message is a direct question about who you are, your name, or what this is — in any language (e.g., "what's your name", "who are you", "ما اسمك", "مين انت") — your reply MUST:
+- begin with your name "{$name}",
+- give a one-line role description,
+- NOT run the standard greet-and-explore script,
+- NOT invent context the user hasn't given (no "your meeting", "your thoughts", etc.),
+- NOT contain the word "Sisly".
+
+For all other messages, follow the coaching script above as normal.
+
+{$languageRule}
+PROMPT;
+    }
+
+    /**
+     * Build the strict language rule from session preferences.
+     *
+     * Overrides any "include Arabic mirror" instructions in upstream
+     * prompts. Honors SessionPreferences.language (en|ar) and
+     * SessionPreferences.arabicMirror (only meaningful for en).
+     */
+    protected function buildLanguageRule(Session $session): string
+    {
+        $language = $session->preferences->language;
+        $arabicMirror = $session->preferences->arabicMirror;
+
         if ($language === 'ar') {
             return <<<PROMPT
-LANGUAGE INSTRUCTION:
-Respond ONLY in Gulf Arabic (Khaleeji dialect - اللهجة الخليجية).
-- Use warm, conversational Gulf Arabic appropriate for UAE, Saudi Arabia, Kuwait, Bahrain, Qatar, and Oman
-- Do NOT include any English text in your response
-- Keep the supportive, empathetic coaching tone
-- Use culturally appropriate expressions
+=== STRICT LANGUAGE RULE ===
+The user prefers Arabic. Respond ONLY in Gulf Arabic (Khaleeji).
+- Do NOT include any English text.
+- EXCEPTION: Always write coach names (MEETLY, VENTO, LOOPY, PRESSO, BOOSTLY) in Latin script. Do not transliterate them.
+- Ignore any earlier instruction that suggests bilingual or English output.
+PROMPT;
+        }
+
+        if ($arabicMirror) {
+            return <<<PROMPT
+=== STRICT LANGUAGE RULE ===
+The user prefers English. Respond in English.
+- The body of your reply MUST be in English.
+- You MAY include at most ONE short Gulf Arabic empathy line in parentheses on the FIRST turn only — never on later turns.
+- No other Arabic anywhere.
 PROMPT;
         }
 
         return <<<PROMPT
-LANGUAGE INSTRUCTION:
-Respond ONLY in English.
-- Use warm, supportive, conversational English
-- Do NOT include any Arabic text in your response
+=== STRICT LANGUAGE RULE ===
+The user prefers English and has DISABLED the Arabic mirror.
+- Respond ONLY in English.
+- ZERO Arabic characters anywhere in your reply — not in parentheses, not as a mirror, not as examples, not at all.
+- Ignore any earlier instruction that tells you to include Arabic mirror lines, Arabic empathy lines, or Gulf phrases. Those instructions are overridden.
 PROMPT;
     }
 
@@ -117,8 +200,10 @@ PROMPT;
     ): string {
         $messages = $session->getHistoryForLLM();
 
-        // Add state-specific context
-        $fullSystemPrompt = $systemPrompt . "\n\n" . $statePrompt;
+        // Add state-specific context, then a final identity anchor that always lands last
+        // in the system prompt. Prevents the coaching script (which dominates the body of
+        // the prompt) from overriding meta-question handling via recency bias.
+        $fullSystemPrompt = $systemPrompt . "\n\n" . $statePrompt . "\n\n" . $this->getIdentityAnchor($session);
 
         $response = $this->llm->chat($messages, $fullSystemPrompt, [
             'temperature' => $this->getTemperatureForState($session->state),

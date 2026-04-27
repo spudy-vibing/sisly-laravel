@@ -92,6 +92,14 @@ class PressoCoach extends BaseCoach
         return 'Pressure and overwhelm coach - de-escalates urgency and regulates the nervous system response to overload.';
     }
 
+    public function getRoleDescription(string $language): string
+    {
+        return match ($language) {
+            'ar' => 'مدربتك لإدارة الضغط والإرهاق',
+            default => 'the coach for overwhelm and work pressure',
+        };
+    }
+
     /**
      * Get the system prompt for a specific state.
      */

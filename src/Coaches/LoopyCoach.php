@@ -91,6 +91,14 @@ class LoopyCoach extends BaseCoach
         return 'Rumination and overthinking coach - breaks thought loops through pattern interruption and present-moment grounding.';
     }
 
+    public function getRoleDescription(string $language): string
+    {
+        return match ($language) {
+            'ar' => 'مدربتك للتفكير المفرط والأفكار المتكررة',
+            default => 'the coach for overthinking and rumination',
+        };
+    }
+
     /**
      * Get the system prompt for a specific state.
      */

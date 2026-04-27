@@ -92,6 +92,14 @@ class BoostlyCoach extends BaseCoach
         return 'Self-doubt and imposter syndrome coach - reconnects people with their actual competence through evidence-based grounding.';
     }
 
+    public function getRoleDescription(string $language): string
+    {
+        return match ($language) {
+            'ar' => 'مدربتك للشك الذاتي ومتلازمة المحتال',
+            default => 'the coach for self-doubt and imposter feelings',
+        };
+    }
+
     /**
      * Get the system prompt for a specific state.
      */
