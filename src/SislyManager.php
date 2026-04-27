@@ -535,10 +535,17 @@ class SislyManager
         $result = $this->responseValidator->validate($responseText);
 
         if (!$result->valid) {
-            // Log the blocked response for review
-            // TODO: Add proper logging
+            if (function_exists('app') && app()->bound('log')) {
+                app('log')->warning('Sisly: response blocked by post-response validator', [
+                    'session_id' => $session->id,
+                    'coach_id' => $session->coachId->value,
+                    'state' => $session->state->value,
+                    'reason' => $result->reason,
+                    'matched_pattern' => $result->matchedPattern,
+                    'response_preview' => mb_substr($responseText, 0, 120),
+                ]);
+            }
 
-            // Return a safe fallback
             return $this->responseValidator->getFallbackResponse($session->preferences->language);
         }
 
