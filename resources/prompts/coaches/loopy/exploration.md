@@ -147,14 +147,6 @@ Then move to time choice.
 
 ---
 
-## Arabic Mirror
-
-Optional for exploration:
-- "عقلك يدور في دايرة." (Your mind is going in circles.)
-- "هذا التفكير الزايد مو مفيد." (This overthinking isn't helpful.)
-
----
-
 ## Common Mistakes
 
 - Don't investigate the content of the loop

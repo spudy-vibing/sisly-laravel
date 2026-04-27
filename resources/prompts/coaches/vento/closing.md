@@ -115,14 +115,6 @@ The question is: can you let yourself breathe for a bit?"
 
 ---
 
-## Arabic Closing
-
-Optional warm touch:
-- "الغضب طلع. خذ راحتك." (The anger is out. Rest now.)
-- "ما يحتاج تشيله لحالك." (You don't have to carry it alone.)
-
----
-
 ## Example Closing Flow
 
 **VENTO:**

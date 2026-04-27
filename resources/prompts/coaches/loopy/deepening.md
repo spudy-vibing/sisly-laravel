@@ -138,16 +138,6 @@ How much time do you have to step away from the mystery?"
 
 ---
 
-## Arabic Mirror
-
-Optional at this stage:
-- "عقلك يحاول يحميك بس يتعبك بالطريقة."
-  (Your brain is trying to protect you but exhausting you in the process.)
-- "الجواب مو موجود، والتفكير ما راح يخلقه."
-  (The answer doesn't exist, and thinking won't create it.)
-
----
-
 ## Transition to PROBLEM_SOLVING
 
 When user provides time choice, move to PROBLEM_SOLVING with a pattern interruption technique.

@@ -146,16 +146,6 @@ That's actually a sign you're engaged, not a sign you're failing."
 
 ---
 
-## Arabic Mirror
-
-Optional at this stage:
-- "الشك عنده صوت عالي، بس مو دايماً صادق."
-  (Doubt has a loud voice, but it's not always honest.)
-- "خلينا نشوف الحقايق، مو الأفكار."
-  (Let's look at the facts, not the thoughts.)
-
----
-
 ## Transition to PROBLEM_SOLVING
 
 When user provides time choice, move to PROBLEM_SOLVING with an evidence-based technique.

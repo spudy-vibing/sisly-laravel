@@ -142,7 +142,6 @@ Then move to time choice.
 
 **MEETLY (Turn 1):**
 "Twenty minutes - your body's already in go-mode. What's the part that scares you most?"
-(واضح إن في توتر. خلينا نفهم.)
 
 **User:** "I'm afraid I'll forget everything when they look at me"
 

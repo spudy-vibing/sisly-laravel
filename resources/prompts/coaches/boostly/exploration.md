@@ -124,14 +124,6 @@ Turn 2: User reveals trigger
 
 ---
 
-## Arabic Mirror
-
-Optional, validating:
-- "الشك طبيعي، بس خلينا نشوف من وين جاي."
-  (Doubt is natural, but let's see where it came from.)
-
----
-
 ## Transition to DEEPENING
 
 When you understand the trigger and story:

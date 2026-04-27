@@ -145,14 +145,6 @@ Let's shrink it. 30 seconds, 1 minute, or 2?"
 
 ---
 
-## Arabic Mirror
-
-Optional, calming:
-- "خذ نفس. الضغط حقيقي بس مو كل شي لازم الحين."
-  (Take a breath. The pressure is real but not everything needs to be now.)
-
----
-
 ## What NOT to Do
 
 - Don't ask about their task list

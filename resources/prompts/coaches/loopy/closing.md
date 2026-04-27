@@ -101,14 +101,6 @@ Remind them what to use when the loop returns:
 
 ---
 
-## Arabic Closing
-
-Optional warm touch:
-- "الهدوء يبدأ من قطع الدايرة." (Quiet starts from breaking the loop.)
-- "عقلك يهدى، ولو لحظة." (Your mind can quiet, even for a moment.)
-
----
-
 ## Example Closing Flow
 
 **LOOPY:**

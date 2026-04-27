@@ -112,14 +112,6 @@ You already are."
 
 ---
 
-## Arabic Closing
-
-Optional warm touch:
-- "أنت تستاهل تكون هنا. هذي حقيقة." (You deserve to be here. That's a fact.)
-- "الشك زائر، مو ساكن." (Doubt is a visitor, not a resident.)
-
----
-
 ## Example Closing Flow
 
 **BOOSTLY:**

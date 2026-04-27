@@ -135,16 +135,6 @@ NOT:
 
 ---
 
-## Arabic Mirror
-
-Optional at this stage:
-- "الضغط في جسمك مو في المهام."
-  (The pressure is in your body, not in the tasks.)
-- "مو كل شي لازم الحين."
-  (Not everything needs to be now.)
-
----
-
 ## Transition to PROBLEM_SOLVING
 
 When user provides time choice, move to PROBLEM_SOLVING with a de-escalation technique.

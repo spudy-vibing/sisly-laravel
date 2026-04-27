@@ -158,17 +158,6 @@ Want me to bring them in? They'll have context from what you've shared.
 
 ---
 
-## Arabic Mirror (Optional)
-
-A brief Arabic touch can ease the transition:
-
-```
-خلينا نساعدك بشكل أفضل.
-(Let's help you in a better way.)
-```
-
----
-
 ## After Handoff
 
 The new coach:
