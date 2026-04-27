@@ -54,6 +54,19 @@ class GratitudeCoach extends BaseCoach implements CoachInterface
     }
 
     /**
+     * Short, per-language role description used in the deterministic
+     * identity reply ("I'm GRATITUDE, the coach for ..."). Required for
+     * every coach since v1.2.0 — must be localized for at least 'en' and 'ar'.
+     */
+    public function getRoleDescription(string $language): string
+    {
+        return match ($language) {
+            'ar' => 'مدربتك لتنمية الامتنان',
+            default => 'the coach for cultivating gratitude',
+        };
+    }
+
+    /**
      * System prompt for the coach at a given state.
      */
     public function getSystemPrompt(SessionState $state): string

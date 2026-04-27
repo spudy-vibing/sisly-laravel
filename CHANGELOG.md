@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Deterministic identity replies**: Identity questions ("what's your name?", "ما اسمك؟", etc.) now bypass the LLM entirely and return a hardcoded `"I'm {COACH}, ..."` reply. Eliminates LLM-flakiness on meta-questions and saves a token round-trip.
+  - New `Sisly\Coaches\IdentityQuestionDetector` — anchored EN regex + AR substring patterns, 60-char message cap to avoid false positives.
+  - New abstract method `BaseCoach::getRoleDescription(string $language)` — must be implemented by every coach.
+  - New `BaseCoach::buildHardcodedIdentityReply(Session)` — returns the deterministic reply with the coach name in **Latin script** in both languages (brand-consistent).
+- `BaseCoach` constructor now accepts an optional 4th argument `IdentityQuestionDetector $identityDetector` for custom detection rules.
+- Live integration test `LanguagePreferenceIntegrationTest` exercising `language=ar` and `arabicMirror=false` against real OpenAI.
+
+### Changed
+- `BaseCoach::buildLanguageRule()` is now the single source of truth for output language. Embedded in the final identity anchor so it lands last in the system prompt.
+- `BaseCoach::buildFullSystemPrompt()` no longer emits the legacy `LANGUAGE INSTRUCTION` block — `buildLanguageRule()` supersedes it.
+- AR responses now keep coach names in Latin script (e.g., "أنا MEETLY") rather than transliterating.
+- `SislyManager::validateAndSanitizeResponse()` now logs blocked responses via `Log::warning` (was: `// TODO`).
+
+### Removed
+- **`Sisly\Arabic\ArabicMirrorGenerator`** class (and its test) — was unused dead code.
+- "Arabic Mirror" / "Arabic Mirror Examples" / "Arabic Closing" sections from all coach prompt files (`system.md`, `exploration.md`, `deepening.md`, `closing.md`) and `global/rules.md` + `global/handoff.md`. Static "include Arabic mirror" instructions in prompts conflicted with the runtime language flag — now removed.
+
+### Fixed
+- **Coach name confusion**: coaches no longer respond as "Sisly" or ignore identity questions. Combination of prompt anchor in each `system.md` + deterministic short-circuit in `BaseCoach::process()`.
+- **`arabicMirror` flag silently ignored**: `SessionPreferences.arabicMirror` now actually controls Arabic content in EN responses (was: prompts hard-coded Arabic mirror lines regardless of the flag).
+- **`language='en'` not honored**: prompts no longer instruct the model to include Arabic regardless of the language preference.
+
+### Migration / Breaking Changes
+- Subclasses of `BaseCoach` MUST now implement `getRoleDescription(string $language): string` (abstract). All 5 built-in coaches updated; external custom coaches need to add this method before upgrading.
+
 ## [1.1.0] - 2026-02-26
 
 ### Added
