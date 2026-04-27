@@ -518,9 +518,6 @@ class SislyManager
         );
 
         event($event);
-
-        // Clean up FSM state
-        $this->stateMachine->cleanup($session->id);
     }
 
     /**
@@ -612,7 +609,11 @@ class SislyManager
         }
 
         $this->endSessionInternal($session, 'manual');
-        $this->sessionStore->save($session);
+
+        // Drop the session from storage so sessionExists() reflects the end.
+        // (Natural-end paths in message() still save the terminal session for
+        // post-mortem inspection — this is the explicit-close case.)
+        $this->sessionStore->delete($sessionId);
     }
 
     /**
