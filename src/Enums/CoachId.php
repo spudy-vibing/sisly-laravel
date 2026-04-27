@@ -11,6 +11,7 @@ enum CoachId: string
     case LOOPY = 'loopy';
     case PRESSO = 'presso';
     case BOOSTLY = 'boostly';
+    case SAFEO = 'safeo';
 
     /**
      * Get the coach's display name.
@@ -23,6 +24,7 @@ enum CoachId: string
             self::LOOPY => 'Loopy',
             self::PRESSO => 'Presso',
             self::BOOSTLY => 'Boostly',
+            self::SAFEO => 'Safeo',
         };
     }
 
@@ -37,6 +39,7 @@ enum CoachId: string
             self::LOOPY => 'Rumination and thought loops',
             self::PRESSO => 'Overload and urgency',
             self::BOOSTLY => 'Self-doubt and imposter feelings',
+            self::SAFEO => 'Uncertainty, regional tension, and big decisions under pressure',
         };
     }
 

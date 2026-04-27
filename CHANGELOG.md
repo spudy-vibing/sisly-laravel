@@ -7,7 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-04-26
+
 ### Added
+- **SAFEO coach**: Sixth coach added — handles uncertainty, regional tension, job insecurity, fear of the unknown, and big life decisions made under pressure.
+  - New `Sisly\Enums\CoachId::SAFEO` enum case (additive — does not break existing matches that include a `default` arm).
+  - New `Sisly\Coaches\SafeoCoach` class with full domain/triggers/greetings.
+  - New prompt set under `resources/prompts/coaches/safeo/{system,exploration,deepening,technique,closing}.md` (and mirrored under `prompts/coaches/safeo/`).
+  - Chain of Emotion: `Uncertainty → Anxiety → Catastrophising → Acknowledgment → Anchoring → Steadiness`.
+  - Enabled by default in `config/sisly.php` `coaches.enabled`. Opt out by removing `'safeo'` from the array.
+  - Dispatcher prompt (`global/dispatcher.md`) and the PHP fallback in `Dispatcher::getDefaultPrompt()` updated to route to SAFEO. Handoff prompt (`global/handoff.md`) extended with SAFEO introductions and example transitions.
+  - Existing 5 coaches' "Out of Scope" handoff lists now include SAFEO cross-references.
+- **Credential & human-ness guardrail** (NIST-AI-RMF / NHS-DCB0129 alignment):
+  - New `Sisly\Coaches\CredentialQuestionDetector` — detects "are you a therapist?", "are you human?", "هل انت حقيقية؟" and similar EN+AR phrasings via tight anchored regex.
+  - New `BaseCoach::buildHardcodedCredentialReply()` returns a deterministic reply that disclaims any clinical credential and any humanity claim. Bypasses the LLM entirely.
+  - `BaseCoach::process()` now checks credential questions BEFORE identity questions so realness/credential queries always receive the disclaimer shape.
+  - `BaseCoach` constructor accepts a 5th optional argument `?CredentialQuestionDetector $credentialDetector` for custom detection.
+  - The FINAL OVERRIDE anchor in every coach's system prompt now explicitly bans claiming any clinical credential or humanity, as a defense-in-depth backstop.
+  - `global/rules.md` gained a new highest-priority `## Credentials & Persona Boundaries` section.
+- **Enriched coach personas** for all 5 existing coaches (MEETLY, VENTO, LOOPY, PRESSO, BOOSTLY) plus the new SAFEO:
+  - New `## Background & Inner Orientation` section per coach: GCC roots, cultural fabric, female-coded voice, *inner orientation* informed by long experience supporting working professionals — explicitly NOT a clinical-credential claim.
+  - New `## Personality` section per coach: relational tone, patience profile, when to speak vs. when to wait.
+  - New `## How I Speak` section per coach: tone rules, single-language enforcement (no mid-message language weaving), one-question cadence.
+  - New `## Gulf Phrasing` section per coach: 3–5 concrete Khaleeji phrases the coach can draw from when the user is writing in Arabic.
+  - Strengthened `## What I Never Do` block per coach with the specific forbidden phrases for that coach (e.g., MEETLY never says "just relax", VENTO never says "calm down", LOOPY never says "stop overthinking", PRESSO never uses productivity jargon, BOOSTLY never uses hollow affirmations).
+  - All coach `system.md` prompt versions bumped from `1.0` to `1.1`.
+- **Regression guard tests** in `tests/Unit/Prompts/PromptsAreCleanTest.php`:
+  - `test_coach_system_prompt_does_not_claim_clinical_credentials` — every coach prompt is scanned for first-person credential assertions.
+  - `test_coach_system_prompt_disclaims_being_a_clinician` — every coach prompt must contain the literal phrase "AI coach".
+- New unit test files: `CredentialQuestionDetectorTest`, `SafeoCoachTest`. New cases extending `HardcodedIdentityReplyTest`, `CoachGreetingsTest`, `CoachIdTest`, `CoachRegistryTest`, `PromptsAreCleanTest`.
+- Integration test additions: SAFEO scenarios in `FullConversationTest::test_dispatcher_routes_to_correct_coach`, `SessionFlowTest::test_can_start_session_with_safeo_coach`, `LanguagePreferenceIntegrationTest`, and `run-conversation-test.php`.
+
+### Changed
+- `CoachId::displayName()` and `CoachId::focus()` exhaustive `match` statements extended with the SAFEO arm.
+- `CoachRegistry::createCoach()` exhaustive `match` extended with the SAFEO arm.
+- `config/sisly.php` `coaches.enabled` default extended from 5 to 6 entries.
+- `global/rules.md` and `global/dispatcher.md` versions bumped to `1.1` to reflect the credential guardrail and the SAFEO domain entry.
+- Test count: 654 → 769 unit tests passing (1668 → 1878 assertions).
+
+### Migration / Behaviour Changes (non-breaking but worth noting)
+- The `CoachId` enum gained one new case (`SAFEO`). Internal exhaustive `match` statements have all been updated. **External consumers using exhaustive `match` over `CoachId` without a `default` arm will encounter `UnhandledMatchError` until they add a `SAFEO` arm.** This is the only behaviourally observable change for downstream code.
+- No method signatures changed. No config keys removed. The `BaseCoach` constructor's new optional `$credentialDetector` parameter is the 5th position; existing 4-arg callers continue to work unchanged.
+
+### Added (carried over from prior release notes)
 - **Deterministic identity replies**: Identity questions ("what's your name?", "ما اسمك؟", etc.) now bypass the LLM entirely and return a hardcoded `"I'm {COACH}, ..."` reply. Eliminates LLM-flakiness on meta-questions and saves a token round-trip.
   - New `Sisly\Coaches\IdentityQuestionDetector` — anchored EN regex + AR substring patterns, 60-char message cap to avoid false positives.
   - New abstract method `BaseCoach::getRoleDescription(string $language)` — must be implemented by every coach.

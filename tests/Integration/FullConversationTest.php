@@ -242,6 +242,14 @@ class FullConversationTest extends IntegrationTestCase
         );
         $this->assertEquals('boostly', $response5->coachId->value);
         Sisly::endSession($response5->sessionId);
+
+        // Future-uncertainty message should route to SAFEO
+        $response6 = Sisly::startSession(
+            message: "I don't know what's going to happen with the layoffs and I can't stop worrying about the future.",
+            context: ['geo' => ['country' => 'AE']]
+        );
+        $this->assertEquals('safeo', $response6->coachId->value);
+        Sisly::endSession($response6->sessionId);
     }
 
     public function test_multi_turn_conversation_maintains_context(): void

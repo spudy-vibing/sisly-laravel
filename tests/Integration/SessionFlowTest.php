@@ -161,6 +161,20 @@ class SessionFlowTest extends TestCase
         $this->assertNotEmpty($response->responseText);
     }
 
+    public function test_can_start_session_with_safeo_coach(): void
+    {
+        $response = Sisly::startSession(
+            message: "I don't know what's going to happen with the layoffs and I can't sleep",
+            context: [
+                'geo' => new GeoContext(country: 'AE'),
+                'coach_id' => 'safeo',
+            ]
+        );
+
+        $this->assertEquals(CoachId::SAFEO, $response->coachId);
+        $this->assertNotEmpty($response->responseText);
+    }
+
     public function test_can_start_session_with_preferences(): void
     {
         $response = Sisly::startSession(

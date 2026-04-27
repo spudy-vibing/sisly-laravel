@@ -16,6 +16,7 @@ class CoachIdTest extends TestCase
         $this->assertEquals('loopy', CoachId::LOOPY->value);
         $this->assertEquals('presso', CoachId::PRESSO->value);
         $this->assertEquals('boostly', CoachId::BOOSTLY->value);
+        $this->assertEquals('safeo', CoachId::SAFEO->value);
     }
 
     public function test_display_names_are_capitalized(): void
@@ -25,6 +26,7 @@ class CoachIdTest extends TestCase
         $this->assertEquals('Loopy', CoachId::LOOPY->displayName());
         $this->assertEquals('Presso', CoachId::PRESSO->displayName());
         $this->assertEquals('Boostly', CoachId::BOOSTLY->displayName());
+        $this->assertEquals('Safeo', CoachId::SAFEO->displayName());
     }
 
     public function test_each_coach_has_focus_description(): void
@@ -40,12 +42,13 @@ class CoachIdTest extends TestCase
     {
         $values = CoachId::values();
 
-        $this->assertCount(5, $values);
+        $this->assertCount(6, $values);
         $this->assertContains('meetly', $values);
         $this->assertContains('vento', $values);
         $this->assertContains('loopy', $values);
         $this->assertContains('presso', $values);
         $this->assertContains('boostly', $values);
+        $this->assertContains('safeo', $values);
     }
 
     public function test_can_create_from_string(): void

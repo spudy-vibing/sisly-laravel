@@ -109,7 +109,7 @@ return [
     */
     'coaches' => [
         'default' => 'meetly',
-        'enabled' => ['meetly', 'vento', 'loopy', 'presso', 'boostly'],
+        'enabled' => ['meetly', 'vento', 'loopy', 'presso', 'boostly', 'safeo'],
     ],
 
     /*

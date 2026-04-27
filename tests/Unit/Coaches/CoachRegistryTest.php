@@ -48,6 +48,7 @@ class CoachRegistryTest extends TestCase
         $this->assertTrue($this->registry->isEnabled(CoachId::LOOPY));
         $this->assertTrue($this->registry->isEnabled(CoachId::PRESSO));
         $this->assertTrue($this->registry->isEnabled(CoachId::BOOSTLY));
+        $this->assertTrue($this->registry->isEnabled(CoachId::SAFEO));
     }
 
     public function test_registry_with_limited_enabled_coaches(): void
@@ -62,6 +63,7 @@ class CoachRegistryTest extends TestCase
         $this->assertFalse($registry->isEnabled(CoachId::LOOPY));
         $this->assertFalse($registry->isEnabled(CoachId::PRESSO));
         $this->assertFalse($registry->isEnabled(CoachId::BOOSTLY));
+        $this->assertFalse($registry->isEnabled(CoachId::SAFEO));
     }
 
     public function test_get_throws_exception_for_disabled_coach(): void
@@ -81,7 +83,7 @@ class CoachRegistryTest extends TestCase
     {
         $coaches = $this->registry->getAllEnabled();
 
-        $this->assertCount(5, $coaches);
+        $this->assertCount(6, $coaches);
 
         foreach ($coaches as $coach) {
             $this->assertInstanceOf(CoachInterface::class, $coach);
@@ -110,6 +112,7 @@ class CoachRegistryTest extends TestCase
         $this->assertContains('loopy', $ids);
         $this->assertContains('presso', $ids);
         $this->assertContains('boostly', $ids);
+        $this->assertContains('safeo', $ids);
     }
 
     public function test_register_allows_custom_coach(): void

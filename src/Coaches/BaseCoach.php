@@ -22,16 +22,19 @@ abstract class BaseCoach implements CoachInterface
     protected PromptLoader $promptLoader;
     protected CoEEngine $coeEngine;
     protected IdentityQuestionDetector $identityDetector;
+    protected CredentialQuestionDetector $credentialDetector;
 
     public function __construct(
         protected readonly LLMProviderInterface $llm,
         ?PromptLoader $promptLoader = null,
         ?CoEEngine $coeEngine = null,
         ?IdentityQuestionDetector $identityDetector = null,
+        ?CredentialQuestionDetector $credentialDetector = null,
     ) {
         $this->promptLoader = $promptLoader ?? new PromptLoader();
         $this->coeEngine = $coeEngine ?? new CoEEngine($llm);
         $this->identityDetector = $identityDetector ?? new IdentityQuestionDetector();
+        $this->credentialDetector = $credentialDetector ?? new CredentialQuestionDetector();
     }
 
     /**
@@ -47,6 +50,19 @@ abstract class BaseCoach implements CoachInterface
      */
     public function process(Session $session, string $message): array
     {
+        // Credential / human-ness questions ("are you a therapist?", "are you human?",
+        // "هل انت حقيقية؟") bypass the LLM and return a deterministic disclaimer.
+        // Checked BEFORE the identity question because credential questions need a
+        // different shape of reply (disclaimer vs name+role) and the model must
+        // never claim a clinical credential, even probabilistically.
+        if ($this->credentialDetector->isCredentialQuestion($message)) {
+            return [
+                'response' => $this->buildHardcodedCredentialReply($session),
+                'arabic_mirror' => null,
+                'coe_trace' => null,
+            ];
+        }
+
         // Identity questions ("what's your name?", "ما اسمك؟", etc.) bypass the
         // LLM entirely and return a deterministic reply. Eliminates flakiness
         // where the model would ignore the meta-question rule and run the
@@ -98,6 +114,27 @@ abstract class BaseCoach implements CoachInterface
     }
 
     /**
+     * Build the deterministic credential / human-ness reply.
+     *
+     * Disclaims any clinical credential and any humanity claim. Required by
+     * NIST-AI-RMF / NHS-DCB0129 posture: the model must not represent itself
+     * as a licensed professional or a human, even when the persona prompt
+     * has been enriched with backstory.
+     *
+     * Coach name stays in Latin script in both languages.
+     */
+    protected function buildHardcodedCredentialReply(Session $session): string
+    {
+        $name = $this->getName();
+
+        if ($session->preferences->language === 'ar') {
+            return "أنا {$name}، مدربة ذكاء اصطناعي — مو طبيبة ولا معالجة. ما أقدر أشخّص أو أعطي نصايح طبية، بس أنا هنا أساعدك تهدّأ. شو في بالك؟";
+        }
+
+        return "I'm {$name}, an AI coach — not a clinician or human. I can't diagnose or give medical advice, but I'm here to help you regulate. What's on your mind?";
+    }
+
+    /**
      * Build the system prompt: global rules + coach-specific content.
      *
      * Language enforcement is handled by buildLanguageRule() via getIdentityAnchor()
@@ -135,12 +172,16 @@ PROMPT;
 
 Your name is {$name}. Sisly is the platform, not your name.
 
+You are an AI coach. You are NOT a psychologist, therapist, psychiatrist, doctor, counselor, clinician, or human being. NEVER claim to be any of these. NEVER claim years of clinical experience, professional credentials, licenses, or the ability to diagnose. Any "experience" mentioned in your persona is inner orientation — not a credential you assert to the user.
+
 If the user's latest message is a direct question about who you are, your name, or what this is — in any language (e.g., "what's your name", "who are you", "ما اسمك", "مين انت") — your reply MUST:
 - begin with your name "{$name}",
 - give a one-line role description,
 - NOT run the standard greet-and-explore script,
 - NOT invent context the user hasn't given (no "your meeting", "your thoughts", etc.),
 - NOT contain the word "Sisly".
+
+If the user asks whether you are a therapist, doctor, real person, human, or AI (e.g., "are you a therapist", "are you human", "هل انت حقيقية") — your reply MUST disclaim that you are an AI coach, not a clinician or human, and offer to help. Do NOT pretend to be human. Do NOT claim a credential.
 
 For all other messages, follow the coaching script above as normal.
 

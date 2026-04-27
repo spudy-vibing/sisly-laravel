@@ -30,6 +30,7 @@ use Sisly\Coaches\VentoCoach;
 use Sisly\Coaches\LoopyCoach;
 use Sisly\Coaches\PressoCoach;
 use Sisly\Coaches\BoostlyCoach;
+use Sisly\Coaches\SafeoCoach;
 use Sisly\DTOs\Session;
 use Sisly\DTOs\SessionPreferences;
 use Sisly\DTOs\GeoContext;
@@ -78,6 +79,7 @@ $coachFactory = [
     'loopy' => fn() => new LoopyCoach($llm, $promptLoader),
     'presso' => fn() => new PressoCoach($llm, $promptLoader),
     'boostly' => fn() => new BoostlyCoach($llm, $promptLoader),
+    'safeo' => fn() => new SafeoCoach($llm, $promptLoader),
 ];
 
 // Test scenarios - one per coach
@@ -132,6 +134,16 @@ $scenarios = [
             "I just got promoted to team lead but I feel like a total fraud. Everyone else is more qualified.",
             "I keep comparing myself to my colleague who has 10 years more experience.",
             "I have about 1 minute. Can you help me feel more grounded?",
+        ],
+    ],
+    [
+        'name' => 'SAFEO: Job Insecurity and Big Decision',
+        'coach' => 'safeo',
+        'coachId' => CoachId::SAFEO,
+        'messages' => [
+            "There are layoffs coming at my company and I don't know if I should stay or start looking now.",
+            "Everything feels so unsteady. I can't sleep thinking about what's coming.",
+            "I have about 1 minute. I just need a moment of quiet.",
         ],
     ],
 ];

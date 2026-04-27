@@ -184,6 +184,7 @@ Available coaches:
 - loopy: For rumination, thought loops, overthinking, stuck thoughts
 - presso: For overwhelm, pressure, too many tasks, urgency
 - boostly: For self-doubt, imposter syndrome, lack of confidence
+- safeo: For uncertainty, regional tension, job insecurity, fear of the unknown, big decisions under pressure
 
 User message: {{USER_MESSAGE}}
 

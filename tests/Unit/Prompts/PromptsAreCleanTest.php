@@ -45,6 +45,7 @@ class PromptsAreCleanTest extends TestCase
             'LOOPY'   => [CoachId::LOOPY],
             'PRESSO'  => [CoachId::PRESSO],
             'BOOSTLY' => [CoachId::BOOSTLY],
+            'SAFEO'   => [CoachId::SAFEO],
         ];
     }
 
@@ -57,5 +58,55 @@ class PromptsAreCleanTest extends TestCase
 
         $this->assertStringNotContainsString('## Arabic Mirror Examples', $prompt);
         $this->assertStringNotContainsString('First response should include one of:', $prompt);
+    }
+
+    /**
+     * Regression guard for the credential reframe in M1+M2: enriched coach
+     * personas must NEVER assert clinical credentials. The persona is
+     * informed by long experience, but the prompt must explicitly disclaim
+     * being a clinician.
+     *
+     * @dataProvider coachProvider
+     */
+    public function test_coach_system_prompt_does_not_claim_clinical_credentials(CoachId $coachId): void
+    {
+        $prompt = strtolower($this->loader->loadCoachSystem($coachId));
+
+        // Hard-banned literal claims (case-insensitive). The prompt may
+        // *disclaim* these (e.g., "not a psychologist") — that's why we
+        // search for first-person assertions rather than the bare word.
+        $forbidden = [
+            '30 years as a psychologist',
+            '30 years experience as a psychologist',
+            '10,000 hours of corporate counselling',
+            'i am a psychologist',
+            'i am a therapist',
+            'i am a doctor',
+            'i am a clinician',
+            'i am a psychiatrist',
+            'years of clinical experience',
+        ];
+
+        foreach ($forbidden as $term) {
+            $this->assertStringNotContainsString(
+                $term,
+                $prompt,
+                "{$coachId->value}'s system prompt must not contain credential claim: '{$term}'"
+            );
+        }
+    }
+
+    /**
+     * @dataProvider coachProvider
+     */
+    public function test_coach_system_prompt_disclaims_being_a_clinician(CoachId $coachId): void
+    {
+        $prompt = $this->loader->loadCoachSystem($coachId);
+
+        $this->assertStringContainsString(
+            'AI coach',
+            $prompt,
+            "{$coachId->value}'s system prompt must explicitly identify as an AI coach"
+        );
     }
 }

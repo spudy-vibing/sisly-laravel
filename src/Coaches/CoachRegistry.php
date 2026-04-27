@@ -111,6 +111,7 @@ class CoachRegistry
             CoachId::LOOPY => new LoopyCoach($this->llm, $promptLoader),
             CoachId::PRESSO => new PressoCoach($this->llm, $promptLoader),
             CoachId::BOOSTLY => new BoostlyCoach($this->llm, $promptLoader),
+            CoachId::SAFEO => new SafeoCoach($this->llm, $promptLoader),
         };
     }
 }

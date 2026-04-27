@@ -9,6 +9,7 @@ use Sisly\Coaches\BoostlyCoach;
 use Sisly\Coaches\LoopyCoach;
 use Sisly\Coaches\MeetlyCoach;
 use Sisly\Coaches\PressoCoach;
+use Sisly\Coaches\SafeoCoach;
 use Sisly\Coaches\VentoCoach;
 use Sisly\Contracts\CoachInterface;
 use Sisly\Contracts\LLMProviderInterface;
@@ -42,6 +43,8 @@ class LanguagePreferenceIntegrationTest extends IntegrationTestCase
         'LOOPY'   => ['en' => 'I keep replaying what I said in the meeting yesterday.', 'ar' => 'أعيد التفكير فيما قلته في الاجتماع أمس.'],
         'PRESSO'  => ['en' => 'I have five deadlines today and cannot start anything.', 'ar' => 'عندي خمسة مواعيد نهائية اليوم ولا أستطيع البدء بأي شيء.'],
         'BOOSTLY' => ['en' => 'Everyone here is smarter than me. I do not belong.',     'ar' => 'كل من هنا أذكى مني. لا أنتمي إلى هذا المكان.'],
+        'SAFEO'   => ['en' => 'I do not know what is going to happen with the layoffs and I cannot stop worrying about the future.',
+                      'ar' => 'ما أدري شو راح يصير مع تقليص الموظفين وما أقدر أوقف القلق على المستقبل.'],
     ];
 
     public function test_arabic_mirror_disabled_produces_zero_arabic_characters(): void
@@ -122,6 +125,7 @@ class LanguagePreferenceIntegrationTest extends IntegrationTestCase
             'LOOPY'   => new LoopyCoach($llm),
             'PRESSO'  => new PressoCoach($llm),
             'BOOSTLY' => new BoostlyCoach($llm),
+            'SAFEO'   => new SafeoCoach($llm),
         ];
     }
 

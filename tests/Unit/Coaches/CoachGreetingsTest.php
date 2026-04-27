@@ -9,6 +9,7 @@ use Sisly\Coaches\BoostlyCoach;
 use Sisly\Coaches\LoopyCoach;
 use Sisly\Coaches\MeetlyCoach;
 use Sisly\Coaches\PressoCoach;
+use Sisly\Coaches\SafeoCoach;
 use Sisly\Coaches\VentoCoach;
 use Sisly\Coaches\BaseCoach;
 use Sisly\Contracts\CoachInterface;
@@ -108,6 +109,7 @@ class CoachGreetingsTest extends TestCase
             'vento' => [new VentoCoach($mock)],
             'loopy' => [new LoopyCoach($mock)],
             'boostly' => [new BoostlyCoach($mock)],
+            'safeo' => [new SafeoCoach($mock)],
         ];
     }
 

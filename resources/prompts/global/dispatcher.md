@@ -2,7 +2,7 @@
 
 **Prompt ID:** G-02
 **Scope:** Intent classification and coach routing
-**Version:** 1.0
+**Version:** 1.1
 
 ---
 
@@ -110,6 +110,25 @@ Your job is classification only. You do NOT coach or respond to the user directl
 
 ---
 
+### SAFEO (coach_id: safeo)
+**Domain:** Uncertainty, regional tension, and big decisions under pressure
+**Triggers:**
+- Regional uncertainty / instability / geopolitical worry
+- Job insecurity (layoffs, restructuring, contract uncertainty)
+- Fear of the unknown / future-anchored anxiety
+- Big life decisions made under pressure (stay/leave, relocate, career pivot)
+- Visa, residency, identity-anchored worry
+- "What's going to happen" diffuse dread
+
+**Example inputs:**
+- "I don't know what's going to happen with the layoffs"
+- "I can't decide whether to stay or leave the country"
+- "Everything feels so unstable right now"
+- "I'm scared of what's coming next"
+- "I have to make a huge decision and I don't know what to do"
+
+---
+
 ## Classification Instructions
 
 Analyze the user message and determine:
@@ -127,7 +146,7 @@ Respond with JSON only. No other text.
 
 ```json
 {
-  "coach_id": "meetly|vento|loopy|presso|boostly",
+  "coach_id": "meetly|vento|loopy|presso|boostly|safeo",
   "confidence": 0.0-1.0,
   "reasoning": "Brief explanation (max 20 words)",
   "alternative_coach_id": "coach_id or null",
@@ -165,6 +184,21 @@ Respond with JSON only. No other text.
 - Primary: PRESSO (overwhelm is dominant)
 - Alternative: BOOSTLY (failure fear present)
 - Confidence: 0.70
+
+**Example 4:** "I keep replaying the conversation and I can't decide if I should leave my job"
+- Primary: SAFEO (the live thread is a big decision under pressure)
+- Alternative: LOOPY (replay pattern is present)
+- Confidence: 0.65
+
+**Example 5:** "I'm scared about the layoffs and I have a presentation tomorrow"
+- Primary: MEETLY (presentation tomorrow is the immediate need)
+- Alternative: SAFEO (job-insecurity dread is the underlying weight)
+- Confidence: 0.70
+
+**Example 6:** "Everything feels so unstable, I don't know what's coming"
+- Primary: SAFEO (diffuse uncertainty without a present task)
+- Alternative: LOOPY (if catastrophising loop dominates)
+- Confidence: 0.80
 
 ---
 

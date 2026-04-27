@@ -29,11 +29,11 @@
 
 ## Overview
 
-Sisly is a Laravel package that provides AI-powered emotional coaching through five specialized coaches, each designed to help users with specific emotional challenges. Built for the GCC market, it includes full Arabic support with Gulf dialect translations.
+Sisly is a Laravel package that provides AI-powered emotional coaching through six specialized coaches, each designed to help users with specific emotional challenges. Built for the GCC market, it includes full Arabic support with Gulf dialect translations.
 
 ### Key Features
 
-- **5 Specialized Coaches** — MEETLY (anxiety), VENTO (anger), LOOPY (overthinking), PRESSO (overwhelm), BOOSTLY (self-doubt)
+- **6 Specialized Coaches** — MEETLY (meeting/presentation anxiety), VENTO (anger), LOOPY (overthinking), PRESSO (overwhelm), BOOSTLY (self-doubt), SAFEO (uncertainty / big decisions)
 - **Safety First** — Crisis detection with deterministic keyword matching, never relies on LLM for safety
 - **Arabic Support** — Full bilingual support with Gulf dialect (Khaleeji) translations
 - **LLM Failover** — Automatic failover between OpenAI and Gemini providers

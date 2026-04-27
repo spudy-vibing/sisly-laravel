@@ -9,6 +9,7 @@ use Sisly\Coaches\BoostlyCoach;
 use Sisly\Coaches\LoopyCoach;
 use Sisly\Coaches\MeetlyCoach;
 use Sisly\Coaches\PressoCoach;
+use Sisly\Coaches\SafeoCoach;
 use Sisly\Coaches\VentoCoach;
 use Sisly\Contracts\CoachInterface;
 use Sisly\DTOs\GeoContext;
@@ -37,6 +38,7 @@ class HardcodedIdentityReplyTest extends TestCase
             'LOOPY'   => [new LoopyCoach($llm),   CoachId::LOOPY,   'LOOPY'],
             'PRESSO'  => [new PressoCoach($llm),  CoachId::PRESSO,  'PRESSO'],
             'BOOSTLY' => [new BoostlyCoach($llm), CoachId::BOOSTLY, 'BOOSTLY'],
+            'SAFEO'   => [new SafeoCoach($llm),   CoachId::SAFEO,   'SAFEO'],
         ];
     }
 
@@ -105,6 +107,68 @@ class HardcodedIdentityReplyTest extends TestCase
 
         // MockProvider tracks calls. The deterministic reply path should never invoke chat().
         $this->assertSame(0, $mockLlm->getCallCount(), 'Identity questions must not invoke the LLM.');
+        $this->assertNotEmpty($result['response']);
+    }
+
+    /**
+     * @dataProvider coachProvider
+     */
+    public function test_english_credential_reply_disclaims_clinical_credentials(
+        CoachInterface $coach,
+        CoachId $coachId,
+        string $expectedName,
+    ): void {
+        $session = $this->makeSession($coachId, 'en');
+
+        $result = $coach->process($session, "Are you a therapist?");
+
+        $this->assertStringContainsString($expectedName, $result['response']);
+        $this->assertStringContainsString('AI coach', $result['response']);
+        $this->assertStringContainsString('not a clinician', $result['response']);
+
+        // Hard guard: the disclaimer must NEVER assert any clinical credential.
+        $forbidden = ['psychologist', 'psychiatrist', 'therapist who', 'I am a therapist',
+                      'I am a doctor', 'licensed', 'qualified to diagnose'];
+        foreach ($forbidden as $term) {
+            $this->assertStringNotContainsStringIgnoringCase(
+                $term,
+                $result['response'],
+                "Credential reply must not contain '{$term}'."
+            );
+        }
+
+        $this->assertNull($result['arabic_mirror']);
+        $this->assertNull($result['coe_trace']);
+    }
+
+    /**
+     * @dataProvider coachProvider
+     */
+    public function test_arabic_credential_reply_disclaims_clinical_credentials(
+        CoachInterface $coach,
+        CoachId $coachId,
+        string $expectedName,
+    ): void {
+        $session = $this->makeSession($coachId, 'ar');
+
+        $result = $coach->process($session, "هل انت حقيقية؟");
+
+        // Coach name MUST stay in Latin script even in Arabic responses.
+        $this->assertStringContainsString($expectedName, $result['response']);
+
+        // Must contain the Arabic AI-coach phrasing.
+        $this->assertStringContainsString('ذكاء اصطناعي', $result['response']);
+    }
+
+    public function test_credential_question_does_not_call_llm(): void
+    {
+        $mockLlm = new MockProvider();
+        $coach = new MeetlyCoach($mockLlm);
+        $session = $this->makeSession(CoachId::MEETLY, 'en');
+
+        $result = $coach->process($session, "Are you human?");
+
+        $this->assertSame(0, $mockLlm->getCallCount(), 'Credential questions must not invoke the LLM.');
         $this->assertNotEmpty($result['response']);
     }
 
