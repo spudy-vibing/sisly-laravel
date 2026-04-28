@@ -78,6 +78,7 @@ class SislyManager
             coachId: $coachId,
             geo: $geo,
             preferences: $preferences,
+            maxHistoryTurns: $this->resolveMaxHistoryTurns(),
         );
 
         // Dispatch session started event
@@ -170,6 +171,7 @@ class SislyManager
             coachId: $coachId,
             geo: $geo,
             preferences: $preferences,
+            maxHistoryTurns: $this->resolveMaxHistoryTurns(),
         );
 
         // Dispatch session started event
@@ -267,6 +269,14 @@ class SislyManager
             throw new SislyException("Session {$sessionId} has ended.");
         }
 
+        // Wall-clock time-threshold check: when elapsed >= max_session_seconds *
+        // nearing_end_threshold and we're not yet in CLOSING, force-transition to
+        // CLOSING BEFORE this turn is processed. The bot's response for this turn
+        // will use the coach's closing.md prompt + a transition bridge (set up
+        // automatically via Session::transitionTo() updating lastTransitionAt),
+        // giving the user a graceful wrap-up rather than an abrupt cutoff.
+        $this->maybeForceClosingForTimeThreshold($session);
+
         // Add user turn
         $session->addTurn(ConversationTurn::user($message));
 
@@ -330,14 +340,26 @@ class SislyManager
             $this->dispatchStateTransitionEvent($session, $previousState);
         }
 
-        // Check if we should end the session
+        // Check if we should end the session.
+        //
+        // End-condition priority (only one fires per turn):
+        //   1. turn_limit  — hard cap on turnCount (safety net for runaway sessions)
+        //   2. time_limit  — wall-clock cap from fsm.max_session_seconds
+        //   3. natural     — FSM walked into CLOSING (only if end_on_terminal_state=true)
+        //
+        // The user always receives the response generated above before any of
+        // these end the session — they get one final graceful turn.
         $maxTurns = $this->config['fsm']['max_total_turns'] ?? 20;
+        $endOnTerminal = $this->config['fsm']['end_on_terminal_state'] ?? true;
+
         if ($session->turnCount >= $maxTurns) {
             $previousState = $session->state;
             $session->transitionTo(SessionState::CLOSING);
             $this->dispatchStateTransitionEvent($session, $previousState);
             $this->endSessionInternal($session, 'turn_limit');
-        } elseif ($this->stateMachine->isTerminal($session->state)) {
+        } elseif ($this->isWallClockExpired($session)) {
+            $this->endSessionInternal($session, 'time_limit');
+        } elseif ($endOnTerminal && $this->stateMachine->isTerminal($session->state)) {
             $this->endSessionInternal($session, 'natural');
         }
 
@@ -732,6 +754,82 @@ class SislyManager
     private function isDispatcherEnabled(): bool
     {
         return $this->config['dispatcher']['enabled'] ?? true;
+    }
+
+    /**
+     * Read session.max_history_turns from config, defaulting to the
+     * Session DTO's own default. Honors zero/negative as "use default"
+     * to avoid pathological configurations.
+     */
+    private function resolveMaxHistoryTurns(): int
+    {
+        $configured = $this->config['session']['max_history_turns'] ?? null;
+
+        if (!is_int($configured) || $configured <= 0) {
+            return Session::DEFAULT_MAX_HISTORY_TURNS;
+        }
+
+        return $configured;
+    }
+
+    /**
+     * Force-transition the session into CLOSING when the wall-clock time
+     * budget is approaching exhaustion (controlled by
+     * fsm.nearing_end_threshold, default 0.85).
+     *
+     * No-op when fsm.max_session_seconds is null (the feature is opt-in)
+     * or when the session is already in CLOSING / a non-coach state.
+     */
+    private function maybeForceClosingForTimeThreshold(Session $session): void
+    {
+        $maxSeconds = $this->config['fsm']['max_session_seconds'] ?? null;
+
+        if (!is_int($maxSeconds) || $maxSeconds <= 0) {
+            return;
+        }
+
+        // Don't disturb an already-closing session, an active crisis, or a
+        // session that's still working through its early states. Crisis
+        // intervention is a trap state and must not be overridden.
+        if ($session->state === SessionState::CLOSING ||
+            $session->state === SessionState::CRISIS_INTERVENTION) {
+            return;
+        }
+
+        $threshold = (float) ($this->config['fsm']['nearing_end_threshold'] ?? 0.85);
+        $elapsed = $this->elapsedSeconds($session);
+
+        if ($elapsed < ($maxSeconds * $threshold)) {
+            return;
+        }
+
+        $previousState = $session->state;
+        $session->transitionTo(SessionState::CLOSING, reason: 'time_threshold');
+        $this->dispatchStateTransitionEvent($session, $previousState);
+    }
+
+    /**
+     * Is the wall-clock budget exhausted for this session?
+     *
+     * Returns false when fsm.max_session_seconds is unset (opt-in feature).
+     */
+    private function isWallClockExpired(Session $session): bool
+    {
+        $maxSeconds = $this->config['fsm']['max_session_seconds'] ?? null;
+
+        if (!is_int($maxSeconds) || $maxSeconds <= 0) {
+            return false;
+        }
+
+        return $this->elapsedSeconds($session) >= $maxSeconds;
+    }
+
+    /**
+     * Wall-clock seconds since session creation.
+     */
+    private function elapsedSeconds(Session $session): int
+    {
+        return (new \DateTimeImmutable())->getTimestamp() - $session->createdAt->getTimestamp();
     }
 
     /**

@@ -13,10 +13,29 @@ use Sisly\Enums\SessionState;
  */
 final class Session
 {
-    private const MAX_HISTORY_TURNS = 20;
+    /**
+     * Default history cap when not provided via config. Older cached sessions
+     * deserialized via fromArray() also fall back to this value.
+     */
+    public const DEFAULT_MAX_HISTORY_TURNS = 20;
 
     /**
      * @param array<ConversationTurn> $history
+     * @param int $maxHistoryTurns FIFO cap on $history length. Read from
+     *        session.max_history_turns config at session-creation time.
+     * @param int $lastTransitionAt $turnCount value at the moment of the
+     *        most recent FSM state transition. Used by BaseCoach to append
+     *        a one-turn "transition bridge" to the system prompt for the
+     *        turn immediately following a transition. 0 means no transition
+     *        has occurred yet.
+     * @param ?SessionState $lastTransitionFromState The state the session
+     *        was in immediately before the most recent transition. Combined
+     *        with $state and $lastTransitionReason it identifies which
+     *        bridge in global/transitions.md to use.
+     * @param ?string $lastTransitionReason Optional qualifier for the most
+     *        recent transition. Currently the only recognised value is
+     *        'time_threshold' (used when SislyManager force-transitions to
+     *        CLOSING because the wall-clock budget is approaching exhaustion).
      */
     public function __construct(
         public readonly string $id,
@@ -31,6 +50,10 @@ final class Session
         public bool $isActive,
         public readonly DateTimeImmutable $createdAt,
         public DateTimeImmutable $lastActivity,
+        public readonly int $maxHistoryTurns = self::DEFAULT_MAX_HISTORY_TURNS,
+        public int $lastTransitionAt = 0,
+        public ?SessionState $lastTransitionFromState = null,
+        public ?string $lastTransitionReason = null,
     ) {}
 
     /**
@@ -41,6 +64,7 @@ final class Session
         CoachId $coachId,
         GeoContext $geo,
         ?SessionPreferences $preferences = null,
+        int $maxHistoryTurns = self::DEFAULT_MAX_HISTORY_TURNS,
     ): self {
         $now = new DateTimeImmutable();
 
@@ -57,6 +81,8 @@ final class Session
             isActive: true,
             createdAt: $now,
             lastActivity: $now,
+            maxHistoryTurns: $maxHistoryTurns,
+            lastTransitionAt: 0,
         );
     }
 
@@ -70,19 +96,27 @@ final class Session
         $this->lastActivity = new DateTimeImmutable();
 
         // Enforce max history (FIFO pruning)
-        if (count($this->history) > self::MAX_HISTORY_TURNS) {
+        if (count($this->history) > $this->maxHistoryTurns) {
             array_shift($this->history);
         }
     }
 
     /**
      * Transition to a new state.
+     *
+     * The optional $reason qualifier is recorded for use by transition
+     * bridges (see global/transitions.md). The only currently recognised
+     * value is 'time_threshold' for force-transitions into CLOSING driven
+     * by the wall-clock cap.
      */
-    public function transitionTo(SessionState $newState): void
+    public function transitionTo(SessionState $newState, ?string $reason = null): void
     {
+        $this->lastTransitionFromState = $this->state;
+        $this->lastTransitionReason = $reason;
         $this->state = $newState;
         $this->stateTurns = 0; // Reset turn counter for new state
         $this->lastActivity = new DateTimeImmutable();
+        $this->lastTransitionAt = $this->turnCount;
     }
 
     /**
@@ -157,6 +191,12 @@ final class Session
             isActive: $data['is_active'],
             createdAt: new DateTimeImmutable($data['created_at']),
             lastActivity: new DateTimeImmutable($data['last_activity']),
+            maxHistoryTurns: $data['max_history_turns'] ?? self::DEFAULT_MAX_HISTORY_TURNS,
+            lastTransitionAt: $data['last_transition_at'] ?? 0,
+            lastTransitionFromState: isset($data['last_transition_from_state'])
+                ? SessionState::from($data['last_transition_from_state'])
+                : null,
+            lastTransitionReason: $data['last_transition_reason'] ?? null,
         );
     }
 
@@ -183,6 +223,10 @@ final class Session
             'is_active' => $this->isActive,
             'created_at' => $this->createdAt->format('c'),
             'last_activity' => $this->lastActivity->format('c'),
+            'max_history_turns' => $this->maxHistoryTurns,
+            'last_transition_at' => $this->lastTransitionAt,
+            'last_transition_from_state' => $this->lastTransitionFromState?->value,
+            'last_transition_reason' => $this->lastTransitionReason,
         ];
     }
 }

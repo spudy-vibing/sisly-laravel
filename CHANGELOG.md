@@ -7,6 +7,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-04-28
+
+### Added
+- **Wall-clock session cap** with graceful close (opt-in). New config `fsm.max_session_seconds` enforces an absolute lifetime from `Session::createdAt`. When the session has consumed `fsm.nearing_end_threshold` (default `0.85`) of its budget, `SislyManager::message()` force-transitions the FSM to `CLOSING` BEFORE generating the next response — so the bot uses the coach's `closing.md` prompt for the wrap-up rather than an abrupt cutoff. When elapsed reaches `max_session_seconds`, the session ends with new `SessionEnded::endReason = 'time_limit'` AFTER returning the user's final response.
+- **Configurable LLM context window**. New config `session.max_history_turns` (default `40`, was hardcoded `20`) controls FIFO history pruning on the `Session` object. Bigger window = LLM stays coherent across longer sessions.
+- **`fsm.end_on_terminal_state` flag** (default `true` = preserve v1.2.0 behaviour). When `false`, transitioning into `CLOSING` does NOT auto-end the session — the FSM stays in CLOSING for graceful multi-turn wrap-up. Recommended `false` for chat-app UX.
+- **Transition bridges** — one-turn carry-over guidance prevents abrupt tone shifts between FSM phases. New `resources/prompts/global/transitions.md` (mirrored under `prompts/global/`) holds bridges for each meaningful transition pair (`intake_to_exploration`, `exploration_to_deepening`, `deepening_to_problem_solving`, `problem_solving_to_closing`) plus a special `any_to_closing_time_threshold` for the wall-clock force-close. `BaseCoach::buildFullSystemPrompt()` appends the relevant bridge for ONE TURN immediately after a transition, instructing the bot to acknowledge continuity from the previous phase before easing into the new one.
+- New `PromptLoader::loadTransitionBridge(SessionState $from, SessionState $to, ?string $reason)` resolves which section of `transitions.md` applies.
+- `Session` DTO gains `int $maxHistoryTurns`, `int $lastTransitionAt`, `?SessionState $lastTransitionFromState`, `?string $lastTransitionReason` properties. All serialized in `toArray`/`fromArray` with back-compat fallback defaults so v1.2.0-cached sessions deserialize unchanged.
+- `Session::transitionTo()` gains an optional `?string $reason` parameter. Currently the only recognised value is `'time_threshold'` — used by `SislyManager` to flag the bridge variant for time-driven force-closes.
+- New `SessionEnded::endReason` value `'time_limit'`.
+- New unit tests: `SessionTest` extended with 10 v1.2.1 cases (configurable history, transition tracking, round-trip), new `tests/Unit/SislyManagerTimeCapTest.php` (7 cases for time threshold + cap + `end_on_terminal_state`), new `tests/Unit/Coaches/TransitionBridgeTest.php` (11 cases for bridge resolution + prompt-assembly integration). Test count: **769 → 796 unit tests, 1878 → 1964 assertions**, all green.
+
+### Changed — bumped defaults (behaviour change for upgrading consumers)
+Session length and engagement increase out of the box. Caps move UP, not down — strictly more conversation room.
+
+| Config key | v1.2.0 | v1.2.1 default |
+|---|---|---|
+| `session.max_history_turns` (NEW) | hardcoded `20` | **`40`** |
+| `fsm.max_total_turns` | `20` (= 10 cycles) | **`40`** (= 20 cycles) |
+| `fsm.turn_limits.exploration` | `2` | **`3`** |
+| `fsm.turn_limits.deepening` | `1` | **`2`** |
+| `fsm.turn_limits.problem_solving` | `3` | **`5`** |
+| `fsm.turn_limits.closing` | `1` | **`2`** |
+| `fsm.max_session_seconds` (NEW) | n/a | `null` (opt-in) |
+| `fsm.end_on_terminal_state` (NEW) | n/a (effective `true`) | `true` |
+| `fsm.nearing_end_threshold` (NEW) | n/a | `0.85` |
+
+Effect on a default-config consumer who upgrades:
+- FSM natural-end at cycle **13** (was 7).
+- Hard cap at cycle **20** (was 10).
+- LLM remembers last **20 cycles** (was 10).
+
+### Migration — keeping exact v1.2.0 behaviour
+Drop this into your app's `config/sisly.php`:
+
+```php
+'session' => [
+    'max_history_turns' => 20,
+],
+'fsm' => [
+    'max_total_turns' => 20,
+    'turn_limits' => [
+        'intake' => 1, 'risk_triage' => 0, 'exploration' => 2,
+        'deepening' => 1, 'problem_solving' => 3, 'closing' => 1,
+    ],
+],
+```
+
+The new opt-in flags (`max_session_seconds`, `end_on_terminal_state`, `nearing_end_threshold`) all default to no-op behaviour and never need to be set if you don't want them.
+
+### Recommended config — "fully engaging up to 10 minutes"
+
+```php
+'session' => [
+    'ttl' => 900,                      // 15 min idle (5 min buffer over the cap)
+    'max_history_turns' => 60,         // ~30 cycles of LLM memory
+],
+'fsm' => [
+    'max_session_seconds'   => 600,    // 10 min wall-clock cap
+    'nearing_end_threshold' => 0.85,   // bot starts closing at 8:30
+    'end_on_terminal_state' => false,  // CLOSING is livable, not a cliff
+    'max_total_turns'       => 60,
+    'turn_limits' => [
+        'intake' => 1, 'risk_triage' => 0,
+        'exploration' => 4, 'deepening' => 3,
+        'problem_solving' => 8, 'closing' => 100,
+    ],
+],
+```
+
 ## [1.2.0] - 2026-04-26
 
 ### Added

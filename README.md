@@ -40,6 +40,7 @@ Sisly is a Laravel package that provides AI-powered emotional coaching through s
 - **Session Management** — Persistent sessions with configurable storage (Cache/Redis)
 - **Chain of Empathy** — Proprietary reasoning framework for empathetic responses
 - **Finite State Machine** — Structured conversation flow from intake to closing
+- **Configurable Session Length** *(v1.2.1)* — Optional wall-clock time cap (`fsm.max_session_seconds`) and graceful CLOSING wrap-up via the `fsm.end_on_terminal_state` flag. Transition bridges (`global/transitions.md`) carry context across FSM phase shifts so the bot never feels like it changed gears mid-conversation. See `CHANGELOG.md` for the recommended "engaging 10-minute" config.
 
 ---
 

@@ -135,23 +135,72 @@ abstract class BaseCoach implements CoachInterface
     }
 
     /**
-     * Build the system prompt: global rules + coach-specific content.
+     * Build the system prompt: global rules + coach-specific content +
+     * (optionally) a one-turn transition bridge.
      *
-     * Language enforcement is handled by buildLanguageRule() via getIdentityAnchor()
-     * which is appended last in generateResponse(). Single source of truth.
+     * The bridge fires only on the turn immediately following an FSM
+     * state transition (detected via Session::$lastTransitionAt). It
+     * instructs the bot to acknowledge continuity from the previous
+     * coaching phase before easing into the new one — preventing the
+     * abrupt tone-shift that the bare new-state prompt would cause.
+     *
+     * Language enforcement is handled by buildLanguageRule() via
+     * getIdentityAnchor() which is appended last in generateResponse().
+     * Single source of truth.
      */
     protected function buildFullSystemPrompt(Session $session): string
     {
         $globalRules = $this->promptLoader->loadGlobal('rules');
         $coachSystem = $this->getSystemPrompt($session->state);
+        $bridge = $this->buildTransitionBridge($session);
 
-        return <<<PROMPT
+        $prompt = <<<PROMPT
 {$globalRules}
 
 ---
 
 {$coachSystem}
 PROMPT;
+
+        if ($bridge !== '') {
+            $prompt .= "\n\n---\n\n## Transition Bridge (this turn only)\n\n{$bridge}";
+        }
+
+        return $prompt;
+    }
+
+    /**
+     * Resolve the transition bridge for this turn (or empty string).
+     *
+     * Returns non-empty content only when:
+     * 1. A transition occurred on the previous turn (i.e. lastTransitionAt
+     *    equals the current turnCount minus 1 — the user has just sent the
+     *    first message after a state change), AND
+     * 2. The from→to pair (with optional reason qualifier) maps to a known
+     *    section in global/transitions.md.
+     *
+     * Bridges fire for ONE TURN only.
+     */
+    protected function buildTransitionBridge(Session $session): string
+    {
+        if ($session->lastTransitionFromState === null) {
+            return '';
+        }
+
+        // Bridge fires on the FIRST turn after a transition. The transition
+        // sets lastTransitionAt to the turnCount at that moment. By the time
+        // BaseCoach runs (after addTurn(user) in SislyManager), turnCount has
+        // incremented by exactly 1 — so a current-cycle bridge is detected
+        // when lastTransitionAt === turnCount - 1.
+        if ($session->lastTransitionAt !== $session->turnCount - 1) {
+            return '';
+        }
+
+        return $this->promptLoader->loadTransitionBridge(
+            from: $session->lastTransitionFromState,
+            to: $session->state,
+            reason: $session->lastTransitionReason,
+        );
     }
 
     /**

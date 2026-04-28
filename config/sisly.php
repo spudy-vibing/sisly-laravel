@@ -70,14 +70,36 @@ return [
     |
     */
     'fsm' => [
-        'max_total_turns' => 20,
+        // Hard cap on total turns (= 2 internal turns per user-perceived cycle).
+        // Acts as a runaway-LLM safety net. Bumped 20 → 40 in v1.2.1.
+        'max_total_turns' => 40,
+
+        // Wall-clock cap in seconds. Opt-in: null disables (matches v1.2.0
+        // behaviour). Set e.g. 600 for 10-minute sessions.
+        'max_session_seconds' => null,
+
+        // When true, transitioning into CLOSING immediately ends the session
+        // (the v1.2.0 behaviour — preserved as default for back-compat).
+        // Set to false for chat-app UX where CLOSING is a livable wrap-up
+        // state rather than a cliff.
+        'end_on_terminal_state' => true,
+
+        // Fraction of max_session_seconds at which the FSM force-transitions
+        // to CLOSING so the bot can wrap gracefully. Only fires when
+        // max_session_seconds is set. 0.85 ≈ ~1.5 min closing window in a
+        // 10-min budget.
+        'nearing_end_threshold' => 0.85,
+
+        // Per-state turn limits (in user-perceived cycles, NOT internal
+        // turns). Bumped in v1.2.1 to give each FSM phase more room to
+        // breathe before advancing.
         'turn_limits' => [
-            'intake' => 1,
-            'risk_triage' => 0,
-            'exploration' => 2,
-            'deepening' => 1,
-            'problem_solving' => 3,
-            'closing' => 1,
+            'intake'          => 1,   // unchanged
+            'risk_triage'     => 0,   // unchanged (auto pass-through)
+            'exploration'     => 3,   // was 2
+            'deepening'       => 2,   // was 1
+            'problem_solving' => 5,   // was 3
+            'closing'         => 2,   // was 1 (matters when end_on_terminal_state=false)
         ],
     ],
 
@@ -95,7 +117,13 @@ return [
     'session' => [
         'driver' => env('SISLY_SESSION_DRIVER', 'cache'),
         'prefix' => 'sisly:session:',
-        'ttl' => 1800, // 30 minutes in seconds
+        'ttl' => 1800, // 30 minutes idle TTL in seconds
+
+        // FIFO cap on conversation history kept on the Session object —
+        // i.e. how many recent turns the LLM sees in its context. Bumped
+        // 20 → 40 in v1.2.1 so longer sessions stay coherent. (Each
+        // user-perceived cycle = 2 history entries: 1 user + 1 assistant.)
+        'max_history_turns' => 40,
     ],
 
     /*

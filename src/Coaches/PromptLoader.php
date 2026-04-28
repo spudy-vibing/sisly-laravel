@@ -9,6 +9,14 @@ use Sisly\Enums\SessionState;
 use Sisly\Exceptions\SislyException;
 
 /**
+ * Recognised reasons that override the default from→to bridge.
+ *
+ * Used by SislyManager when force-transitioning into CLOSING because
+ * the wall-clock budget is approaching exhaustion — the bridge for
+ * that case must NOT mention the time limit to the user.
+ */
+
+/**
  * Loads prompt files from the resources directory.
  *
  * Supports both package defaults and consumer overrides.
@@ -86,6 +94,109 @@ class PromptLoader
     {
         $stateName = $this->mapStateToPromptName($state);
         return $this->loadCoach($coach, $stateName);
+    }
+
+    /**
+     * Load the transition bridge for a from→to state pair.
+     *
+     * Returns the bridge content from `global/transitions.md` matching the
+     * given pair, or an empty string when no bridge applies. Bridges are
+     * appended to the system prompt by BaseCoach for one turn only,
+     * immediately following an FSM transition, to avoid abrupt shifts in
+     * the bot's tone between coaching phases.
+     *
+     * The optional $reason qualifier overrides the default lookup. The
+     * recognised value is `time_threshold` for force-transitions into
+     * CLOSING driven by `fsm.max_session_seconds` — that bridge tells the
+     * bot to wrap gracefully without naming the time limit.
+     */
+    public function loadTransitionBridge(
+        SessionState $from,
+        SessionState $to,
+        ?string $reason = null,
+    ): string {
+        $sectionKey = $this->resolveBridgeSection($from, $to, $reason);
+
+        if ($sectionKey === null) {
+            return '';
+        }
+
+        $cacheKey = "transition_bridge:{$sectionKey}";
+
+        if (isset($this->cache[$cacheKey])) {
+            return $this->cache[$cacheKey];
+        }
+
+        $document = $this->loadGlobal('transitions');
+        $section = $this->extractBridgeSection($document, $sectionKey);
+        $this->cache[$cacheKey] = $section;
+
+        return $section;
+    }
+
+    /**
+     * Resolve which section of transitions.md applies for a given
+     * from→to pair (and optional reason qualifier).
+     */
+    private function resolveBridgeSection(
+        SessionState $from,
+        SessionState $to,
+        ?string $reason,
+    ): ?string {
+        // Time-threshold force-transition into CLOSING uses a special bridge
+        // regardless of which state the session was in. The user must not
+        // be told about the time limit.
+        if ($reason === 'time_threshold' && $to === SessionState::CLOSING) {
+            return 'any_to_closing_time_threshold';
+        }
+
+        // RISK_TRIAGE is a pass-through state — never bridges. CRISIS_INTERVENTION
+        // is a trap state — bridges would be inappropriate there.
+        if ($from === SessionState::RISK_TRIAGE ||
+            $to === SessionState::RISK_TRIAGE ||
+            $from === SessionState::CRISIS_INTERVENTION ||
+            $to === SessionState::CRISIS_INTERVENTION) {
+            return null;
+        }
+
+        $key = "{$from->value}_to_{$to->value}";
+
+        // Whitelisted normal-flow bridges. Other pairs return null and the
+        // coach prompt for the new state takes over unaided.
+        $known = [
+            'intake_to_exploration',
+            'exploration_to_deepening',
+            'deepening_to_problem_solving',
+            'problem_solving_to_closing',
+        ];
+
+        return in_array($key, $known, true) ? $key : null;
+    }
+
+    /**
+     * Pull a single `## Bridge: <key>` section out of transitions.md.
+     */
+    private function extractBridgeSection(string $document, string $sectionKey): string
+    {
+        $headingPattern = '/^##\s+Bridge:\s+' . preg_quote($sectionKey, '/') . '\s*$/m';
+
+        if (preg_match($headingPattern, $document, $matches, PREG_OFFSET_CAPTURE) !== 1) {
+            return '';
+        }
+
+        $start = $matches[0][1] + strlen($matches[0][0]);
+        $tail = substr($document, $start);
+
+        // The next `##` heading marks the end of the section. If absent, the
+        // section runs to the end of the document.
+        if (preg_match('/^##\s+/m', $tail, $next, PREG_OFFSET_CAPTURE) === 1) {
+            $tail = substr($tail, 0, $next[0][1]);
+        }
+
+        // Drop the trailing `---` separator if present.
+        $tail = preg_replace('/\n---\s*$/', '', $tail) ?? $tail;
+
+        return trim($tail);
     }
 
     /**
